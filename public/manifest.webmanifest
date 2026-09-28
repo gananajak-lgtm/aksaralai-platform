@@ -1,0 +1,19 @@
+{
+  "name": "อักษราลัย - อ่านและเขียนนิยาย",
+  "short_name": "อักษราลัย",
+  "description": "แพลตฟอร์มอ่านและเขียนนิยายภาษาไทย",
+  "lang": "th",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#171326",
+  "theme_color": "#20192e",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
