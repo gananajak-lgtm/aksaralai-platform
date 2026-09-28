@@ -36,12 +36,12 @@ async function api(req,env){
   // Keep diagnostic stages coarse: never expose passwords, hashes, or SQL internals.
   let passhash;
   try { passhash=await passwordHash(password); }
-  catch(e){e.code='AUTH_HASH';throw e;}
+  catch(e){throw Object.assign(new Error('AUTH_HASH'),{code:'AUTH_HASH',cause:e});}
   let r;
   try {r=await run(db,'INSERT INTO users(username,display_name,passhash,role,created_at) VALUES(?,?,?,?,?)',username,name,passhash,d.role,clock());}
-  catch(e){if(/UNIQUE/i.test(String(e)))failure(409,'ชื่อผู้ใช้ซ้ำ');e.code='AUTH_INSERT';throw e;}
+  catch(e){if(/UNIQUE/i.test(String(e)))failure(409,'ชื่อผู้ใช้ซ้ำ');throw Object.assign(new Error('AUTH_INSERT'),{code:'AUTH_INSERT',cause:e});}
   try {return reply({ok:true},201,{'set-cookie':await session(db,r.meta.last_row_id)});}
-  catch(e){e.code='AUTH_SESSION';throw e;}
+  catch(e){throw Object.assign(new Error('AUTH_SESSION'),{code:'AUTH_SESSION',cause:e});}
  }
  if(p==='/api/login'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',1,24),password=str(d,'password',1,128);
