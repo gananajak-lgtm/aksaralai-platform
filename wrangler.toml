@@ -1,0 +1,18 @@
+name = "aksaralai-platform"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/health"]
+
+# Create a separate D1 database with:
+# npx wrangler d1 create aksaralai-db
+# Then replace the placeholder with its UUID.
+[[d1_databases]]
+binding = "DB"
+database_name = "aksaralai-db"
+database_id = "PLACEHOLDER_DATABASE_ID"
+migrations_dir = "migrations"
