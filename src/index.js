@@ -33,8 +33,15 @@ async function api(req,env){
  if(p==='/api/register'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',3,24),name=str(d,'display_name',1,50),password=str(d,'password',8,128);
   if(!/^[a-zA-Z0-9_]{3,24}$/.test(username)||!['reader','writer'].includes(d.role))failure(400,'บัญชีหรือบทบาทไม่ถูกต้อง');
-  let r;try{r=await run(db,'INSERT INTO users(username,display_name,passhash,role,created_at) VALUES(?,?,?,?,?)',username,name,await passwordHash(password),d.role,clock());}catch(e){if(/UNIQUE/i.test(String(e)))failure(409,'ชื่อผู้ใช้ซ้ำ');throw e;}
-  return reply({ok:true},201,{'set-cookie':await session(db,r.meta.last_row_id)});
+  // Keep diagnostic stages coarse: never expose passwords, hashes, or SQL internals.
+  let passhash;
+  try { passhash=await passwordHash(password); }
+  catch(e){e.code='AUTH_HASH';throw e;}
+  let r;
+  try {r=await run(db,'INSERT INTO users(username,display_name,passhash,role,created_at) VALUES(?,?,?,?,?)',username,name,passhash,d.role,clock());}
+  catch(e){if(/UNIQUE/i.test(String(e)))failure(409,'ชื่อผู้ใช้ซ้ำ');e.code='AUTH_INSERT';throw e;}
+  try {return reply({ok:true},201,{'set-cookie':await session(db,r.meta.last_row_id)});}
+  catch(e){e.code='AUTH_SESSION';throw e;}
  }
  if(p==='/api/login'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',1,24),password=str(d,'password',1,128);
@@ -135,7 +142,7 @@ export default {async fetch(req,env){
    if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
    if(req.headers.get('sec-fetch-site')==='cross-site')return reply({detail:'Forbidden site'},403);
   }
-  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message},status);}
+  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
  }
  if(!['GET','HEAD'].includes(m))return new Response('Method not allowed',{status:405});
  if(!env.ASSETS)return new Response('Missing static assets binding',{status:503});
