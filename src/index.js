@@ -10,7 +10,9 @@ function str(obj,key,min=0,max=1000){if(typeof obj[key]!=='string')failure(400,'
 async function payload(req){if(Number(req.headers.get('content-length')||0)>200000)failure(413,'ข้อมูลใหญ่เกินกำหนด');if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'ต้องส่ง JSON');const raw=await req.text();if(enc.encode(raw).length>200000)failure(413,'ข้อมูลใหญ่เกินกำหนด');let value;try{value=JSON.parse(raw);}catch{failure(400,'JSON ไม่ถูกต้อง');}if(!value||Array.isArray(value)||typeof value!=='object')failure(400,'รูปแบบข้อมูลไม่ถูกต้อง');return value;}
 const hex=arr=>Array.from(arr,x=>x.toString(16).padStart(2,'0')).join('');
 async function sha(str){return hex(new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(str))));}
-async function deriv(password,salt){const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);return hex(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},key,256)));}
+// Workers production caps one PBKDF2 invocation at 100,000 iterations. This MVP hashing
+// cost is below current OWASP recommendations: review stronger password storage before launch.
+async function deriv(password,salt){const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);return hex(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},key,256)));}
 async function passwordHash(password){const salt=crypto.getRandomValues(new Uint8Array(16));return hex(salt)+':'+await deriv(password,salt);}
 async function matches(password,stored){if(!/^[0-9a-f]{32}:[0-9a-f]{64}$/.test(stored||''))return false;const [s,h]=stored.split(':');const salt=Uint8Array.from(s.match(/../g),x=>parseInt(x,16));const test=await deriv(password,salt);let diff=0;for(let i=0;i<h.length;i++)diff|=h.charCodeAt(i)^test.charCodeAt(i);return diff===0;}
 const cookie=req=>(req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('aksaralai_session='))?.slice(18)||'';
