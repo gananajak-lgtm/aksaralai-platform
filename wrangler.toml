@@ -14,5 +14,5 @@ run_worker_first = ["/api/*", "/health"]
 [[d1_databases]]
 binding = "DB"
 database_name = "aksaralai-db"
-database_id = "PLACEHOLDER_DATABASE_ID"
+database_id = "31badb5e-4c01-4873-bc83-2c2aedabd39e"
 migrations_dir = "migrations"
