@@ -1,29 +1,44 @@
-# อักษราลัย (Aksaralai)
+# อักษราลัย (Aksaralai) 📚
 
-แพลตฟอร์มอ่านและเขียนนิยายภาษาไทย รองรับสมาชิกหลายบัญชี ระบบอ่านออกเสียงภาษาไทย และการติดตั้งเว็บลงหน้าจอหลัก (PWA)
+เว็บไซต์ PWA สำหรับอ่านและเขียนนิยายภาษาไทย มีบัญชีนักอ่านและนักเขียนแยกบทบาท ใช้ **Cloudflare Workers + D1** เป็น Backend และฐานข้อมูลส่วนกลาง พร้อม Web Speech API สำหรับอ่านออกเสียงภาษาไทยตามความสามารถของอุปกรณ์
 
-## สถานะงาน (MVP 0.4)
+## สิ่งที่มีใน GitHub แล้ว
 
-- ต้นแบบฉบับ Cloudflare Workers + D1 ทำเสร็จแล้วในแพ็กเกจ ZIP ที่ส่งในแชท
-- Repo นี้เริ่มมีไฟล์กำหนดโฮสต์ `wrangler.toml`, คำสั่งใน `package.json`, และสคีมาฐานข้อมูล `migrations/0001_initial.sql`
-- **ยังไม่ได้ใส่ไฟล์ `src/index.js` และ `public/` จาก ZIP ลง Repo นี้** โปรเจกต์ใน GitHub จึงยัง deploy ไม่ได้จนกว่าจะนำไฟล์ที่เหลือเข้ามา
-- ยังไม่มี Cloudflare D1 ID หรือเว็บไซต์สาธารณะ และยังไม่เปิดรับสมาชิกจริง
+- `public/index.html` — เว็บแอปแบบ Responsive: สำรวจนิยาย, เข้าสู่ระบบ, ชั้นหนังสือ, หน้าตอน, สตูดิโอนักเขียน และเครื่องเล่นอ่านออกเสียง
+- `public/sw.js`, `public/manifest.webmanifest` และไอคอน — โครงสร้าง PWA สำหรับเพิ่มลงหน้าจอหลัก
+- `src/index.js` — API สมัครสมาชิก/ล็อกอิน/ล็อกเอาต์, สิทธิ์นักเขียน, CRUD นิยายและตอน, ฉบับร่าง/เผยแพร่, progress, shelves, comments
+- `migrations/0001_initial.sql` — ฐานข้อมูล D1 เฉพาะอักษราลัย (ไม่ใช้ฐานข้อมูลพิภพเร้นลับ)
+- `test/api.test.js` และ GitHub Actions CI — ชุดทดสอบ API และไวยากรณ์สคริปต์
 
-## นำไฟล์เข้า Repository
+## ทดลองบนเครื่องด้วย Node.js 22+
 
-แตกไฟล์แพ็กเกจ `aksaralai-cloudflare-pwa-v0.4.zip` ที่ได้รับจากแชท แล้วนำเนื้อหาด้านในทั้งหมดเข้า Repo นี้ โดยรักษาโฟลเดอร์ `src/`, `public/`, `migrations/` ตามเดิม และเลือกแทนไฟล์ซ้ำตามเวอร์ชันใน ZIP
+```bash
+npm install
+npm run db:local
+npm run dev
+npm test
+```
 
-## Deploy หลังจากโค้ดครบ
+เปิด URL ที่ Wrangler แสดงหลังรัน dev ได้เลย ตัวทดสอบใช้ in-memory SQLite mock ให้เสมือน D1; ควรทดสอบ integration บน D1 จริงก่อนใช้งานกับผู้ใช้ภายนอกด้วย
 
-1. ติดตั้ง Node.js และรัน `npm install`
-2. เข้า Cloudflare ผ่าน `npx wrangler login`
-3. สร้าง D1 แยกต่างหาก: `npx wrangler d1 create aksaralai-db`
-4. คัดลอก `database_id` ที่ได้มาแทน `PLACEHOLDER_DATABASE_ID` ใน `wrangler.toml`
-5. รัน `npm run db:remote` เพื่อสร้างตาราง
-6. รัน `npm run deploy` และตรวจหน้าเว็บผ่าน HTTPS ของ Cloudflare
+## ติดตั้ง Cloudflare (ยังไม่ได้ deploy)
 
-**ห้ามนำ UUID ของฐานข้อมูลพิภพเร้นลับมาใช้** และห้ามใส่ API token, รหัสผ่าน หรือ secrets ไว้ใน GitHub
+1. ใช้ **บัญชี Cloudflare ของเจ้าของโปรเจกต์** โดยสร้าง Worker และฐานข้อมูลใหม่ ไม่แตะ resource ของพิภพเร้นลับ
+2. `npx wrangler login`
+3. `npx wrangler d1 create aksaralai-db`
+4. นำ UUID ฐานข้อมูล **ใหม่** มาแทน `PLACEHOLDER_DATABASE_ID` ใน `wrangler.toml`
+5. `npm run db:remote`
+6. `npm run deploy`
+7. เปิด HTTPS workers.dev URL ที่ CLI แสดง แล้วตรวจ PWA และเสียงอ่านบนมือถือจริง
 
-## ก่อนเปิดให้บุคคลทั่วไปใช้
+อ่านเอกสาร Cloudflare: https://developers.cloudflare.com/workers/static-assets/ และ https://developers.cloudflare.com/d1/get-started/
 
-ต้องเสริม rate limiting, CAPTCHA / Turnstile, ระบบรีเซ็ตรหัสผ่าน, ตรวจสอบอีเมล, รายงานเนื้อหา, สำรองฐานข้อมูล และตรวจสอบ deployment จริงก่อนเปิดรับสมาชิก
+**คำเตือน:** อย่าส่ง Cloudflare API token, password หรือค่า secret ให้ผู้อื่นทางแชท และห้ามใช้ database UUID ของพิภพเร้นลับในไฟล์นี้
+
+## ข้อจำกัดก่อนเปิดให้คนทั่วไปสมัคร
+
+แพลตฟอร์มนี้ยังเป็น MVP ไม่มี CAPTCHA/Turnstile, rate limits, email verification, password reset, ระบบรายงานหรือตรวจสอบเนื้อหา, การบล็อกบัญชี, เครื่องมือผู้ดูแล, นโยบายข้อมูลส่วนบุคคล และแผนสำรองข้อมูล โปรดอย่าเปิดรับข้อมูลบัญชีจริงเป็นวงกว้างก่อนปิดช่องว่างเหล่านี้
+
+เสียงอ่านใช้ `speechSynthesis` ของเครื่องผู้ใช้ ไม่ใช่ API เสียง AI; อุปกรณ์บางรุ่นอาจไม่มีเสียงไทยหรือหยุดอ่านเมื่อพักหน้าจอ ระบบยังไม่มีเหรียญหรือการชำระเงินจริง
+
+**สถานะ deployment:** Repo มีโค้ดและไฟล์ตั้งค่าพื้นฐานแล้ว แต่ยังไม่มี D1 UUID, ยังไม่ deploy และยังไม่มี URL สาธารณะ
