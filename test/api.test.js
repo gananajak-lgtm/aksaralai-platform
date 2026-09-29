@@ -56,3 +56,22 @@ test('reject foreign origins, duplicate usernames and incorrect passwords',async
  assert.equal((await h.api('/login','POST',{username:'writer02',password:'wrong'})).status,401);
  assert.equal((await h.api('/login','POST',{username:'writer02',password:'long-password-01'})).status,200);
 });
+
+test('accepts large Thai chapters beyond prior 200KB request limit',async()=>{
+ const h=harness();
+ assert.equal((await h.api('/register','POST',{username:'longwriter',display_name:'Long Author',password:'long-password-01',role:'writer'})).status,201);
+ const novel=await h.api('/writer/novels','POST',{title:'นิยายยาว',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ assert.equal(novel.status,201);
+ const body='ก'.repeat(80000); // 240KB UTF-8, previously rejected.
+ const chapter=await h.api('/writer/novels/'+novel.id+'/chapters','POST',{title:'ตอนที่สอง',body});
+ assert.equal(chapter.status,201);
+ const fetched=await h.api('/chapters/'+chapter.id);
+ assert.equal(fetched.chapter.body.length,80000);
+});
+test('refuses chapter over 300k characters',async()=>{
+ const h=harness();
+ assert.equal((await h.api('/register','POST',{username:'lengthwriter',display_name:'Length Author',password:'long-password-01',role:'writer'})).status,201);
+ const novel=await h.api('/writer/novels','POST',{title:'ขนาดตอน',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const chapter=await h.api('/writer/novels/'+novel.id+'/chapters','POST',{title:'เกินกำหนด',body:'ก'.repeat(300001)});
+ assert.equal(chapter.status,400);
+});
