@@ -243,7 +243,7 @@ function say(t){
 }
 // Android TTS engines may silently drop speak() when it immediately follows cancel().
 // Defer the replacement utterance to give the engine time to release its old queue.
-function playFromCheckpoint(){var mp3=document.getElementById('mp3-audio');if(mp3&&!mp3.paused)mp3.pause();ticket++;var current=ticket;active=true;paused=false;engine.cancel();status();setTimeout(function(){if(active&&!paused&&current===ticket)say(current);},200);}
+function playFromCheckpoint(){var mp3=document.getElementById('mp3-audio');if(mp3&&typeof mp3.pause==='function'&&!mp3.paused)mp3.pause();ticket++;var current=ticket;active=true;paused=false;engine.cancel();status();setTimeout(function(){if(active&&!paused&&current===ticket)say(current);},200);}
 button.onclick=function(){
  if(!active){playFromCheckpoint();return;}
  if(paused){playFromCheckpoint();return;}
