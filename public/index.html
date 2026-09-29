@@ -59,10 +59,7 @@ function pronunciationText(text,entries){
  }
  return out;
 }
-function initializeAudio(body,chapterId){');});
- // A combined regex ensures replacements introduced by another rule are not replaced again.
- var sorted=entries.slice().sort(function(a,b){return b.word.length-a.word.length;});
- var pattern=new RegExp(sorted.map(function(e){return e.word.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g,'\\function initializeAudio(body,chapterId){');}).join('|'),'g');
+function initializeAudio(body,chapterId){');}).join('|'),'g');
  var table=new Map(sorted.map(function(e){return [e.word,e.sound];}));
  return output.replace(pattern,function(m){return table.get(m)||m;});
 }
