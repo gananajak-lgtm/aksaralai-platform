@@ -95,6 +95,17 @@ test('anonymous visitors can browse the catalog but cannot fetch chapter content
  assert.equal((await h.api('/chapters/'+c.id)).chapter.body,'เนื้อหาที่ต้องเข้าสู่ระบบ');
 });
 
+test('preview diagnostics only reveal presence and username match, never secret values',async()=>{
+ const h=harness({OPENAI_API_KEY:'should-never-leak',OPENAI_TTS_ADMIN_USERNAME:'wrong-user'});
+ assert.equal((await h.api('/register','POST',{username:'gananajak',display_name:'Owner',password:'long-password-03',role:'writer'})).status,201);
+ const result=await h.api('/writer/tts-preview/status');
+ assert.deepEqual(result,{status:200,enabled:false,checks:{api_key_present:true,admin_username_present:true,username_matches:false}});
+ assert.equal(JSON.stringify(result).includes('should-never-leak'),false);
+ assert.equal(JSON.stringify(result).includes('wrong-user'),false);
+ const disabled=harness();
+ assert.equal((await disabled.api('/register','POST',{username:'writer99',display_name:'Writer',password:'long-password-04',role:'writer'})).status,201);
+ assert.deepEqual((await disabled.api('/writer/tts-preview/status')).checks,{api_key_present:false,admin_username_present:false,username_matches:false});
+});
 test('OpenAI preview is disabled by default and reserved for configured owner with three daily attempts',async()=>{
  const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'adminwriter'});
  const admin={username:'adminwriter',display_name:'ผู้ดูแล',password:'long-password-01',role:'writer'};
