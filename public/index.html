@@ -67,8 +67,10 @@ function say(t){
 function playFromCheckpoint(){ticket++;engine.cancel();active=true;paused=false;say(ticket);}
 button.onclick=function(){
  if(!active){playFromCheckpoint();return;}
- if(paused){paused=false;engine.resume();status();}
- else{paused=true;engine.pause();checkpoint();status();}
+ if(paused){playFromCheckpoint();return;}
+ // Some Android synthesizers do not reliably resume a paused utterance.
+ // Cancel the current chunk, invalidate its callbacks, and restart it on demand.
+ else{paused=true;ticket++;checkpoint();engine.cancel();status();}
 };
 document.getElementById('stop').onclick=function(){checkpoint();ticket++;engine.cancel();active=false;paused=false;status();};
 restartButton.onclick=function(){ticket++;engine.cancel();index=0;clearCheckpoint();active=true;paused=false;say(ticket);};
