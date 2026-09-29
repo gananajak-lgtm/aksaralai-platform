@@ -106,3 +106,22 @@ test('long unpunctuated text is split into brief checkpoints on Thai speech engi
  assert.ok(chunks.every(x=>x.length<=64),'no speech segment should exceed 64 characters');
  assert.equal(chunks.join(''),body);
 });
+
+test('Thai segmentation preserves complete wording without splitting inside segmented words',()=>{
+ const ctx=harness(new Map(),new Map()).context;
+ const split=vm.runInNewContext(speechCode+'\nsplitText',ctx);
+ const body='อาณาจักรโบราณยามราตรีมีเสียงกระซิบแว่วจากป่าลึก'.repeat(5);
+ const parts=split(body);
+ assert.equal(parts.join(''),body);
+ const seg=new Intl.Segmenter('th',{granularity:'word'});
+ const positions=new Set([0]);let i=0;
+ for(const word of seg.segment(body)){i+=word.segment.length;positions.add(i);}
+ let cursor=0;for(const part of parts){cursor+=part.length;assert.ok(positions.has(cursor),'cut must occur at Thai word boundary');}
+});
+test('punctuation and quotes are silent while visual novel remains unchanged',()=>{
+ const h=harness(new Map(),new Map());
+ h.initialize('“เสียงลึกลับ…”',44);h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken[0].text,'เสียงลึกลับ');
+ assert.ok(!h.spoken[0].onboundary,'normalized text must not store incorrect raw offsets');
+ assert.equal(h.els.get('reading').innerHTML.includes('“เสียงลึกลับ…”'),true);
+});
