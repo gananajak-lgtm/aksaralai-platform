@@ -62,16 +62,29 @@ function splitText(s){
  });
  return out;
 }
+// Expand Thai repetition mark only in the audio text, never in the manuscript.
+function expandThaiRepeats(text){
+ var segmenter;
+ try{if(typeof Intl!=='undefined'&&Intl.Segmenter)segmenter=new Intl.Segmenter('th',{granularity:'word'});}catch(e){}
+ return text.replace(/([\u0e01-\u0e4e]+)([ \t]*)ๆ/g,function(all,phrase){
+  var word=phrase;
+  if(segmenter){
+   var pieces=Array.from(segmenter.segment(phrase)).filter(function(item){return item.isWordLike;});
+   if(pieces.length)word=pieces[pieces.length-1].segment;
+  }
+  return phrase+' '+word;
+ });
+}
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
 function speechText(s){
- return s.replace(/[“”„‟«»「」『』"']/g,' ')
+ return expandThaiRepeats(s.replace(/[“”„‟«»「」『』"']/g,' ')
   .replace(/[…⋯]|\.{2,}/g,' ')
   .replace(/[()\[\]{}]/g,' ')
   .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
   // Keep sentence spacing and a pause where the original manuscript has a line break.
   .replace(/\r?\n+/g,' ')
   .replace(/[ \t]{2,}/g,' ')
-  .trim();
+  .trim());
 }
 
 // Reader-controlled pronunciation replacements; no manuscript changes or external requests.
