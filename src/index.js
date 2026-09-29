@@ -75,6 +75,51 @@ async function api(req,env){
   const chapters=await rows(db,'SELECT id,title,position FROM chapters WHERE novel_id=? '+(owner?'':'AND published=1 ')+'ORDER BY position',n.id);
   return reply({chapter:c,novel:{id:n.id,title:n.title},chapters});
  }
+
+ // Each MP3 is private in R2. Chapter access uses the same membership rules as text.
+ if((m==='GET')&&(x=p.match(/^\/api\/chapters\/(\d+)\/audio\/status$/))){
+  const user=await identity(db,req,true);
+  await chapter(db,integer(x[1]),user);
+  if(!env.AUDIO)return reply({available:false,configured:false});
+  const file=await env.AUDIO.head('chapters/'+x[1]+'.mp3');
+  return reply({available:Boolean(file),configured:true,size:file?.size||0});
+ }
+ if((m==='GET')&&(x=p.match(/^\/api\/chapters\/(\d+)\/audio$/))){
+  const user=await identity(db,req,true);
+  await chapter(db,integer(x[1]),user);
+  if(!env.AUDIO)failure(503,'ยังไม่เปิดใช้งานพื้นที่เก็บเสียง MP3');
+  const key='chapters/'+x[1]+'.mp3',head=await env.AUDIO.head(key);
+  if(!head)failure(404,'ตอนนี้ยังไม่มีเสียง MP3');
+  const headers=new Headers({'content-type':'audio/mpeg','accept-ranges':'bytes','cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline'});
+  const r=req.headers.get('range');let range,status=200;
+  if(r){
+   const match=/^bytes=(\d*)-(\d*)$/.exec(r);
+   if(!match||(match[1]===''&&match[2]===''))return new Response(null,{status:416,headers:{'content-range':'bytes */'+head.size,'accept-ranges':'bytes','cache-control':'no-store'}});
+   let start=match[1]===''?Math.max(0,head.size-Number(match[2])):Number(match[1]);
+   let end=match[1]===''?head.size-1:(match[2]===''?head.size-1:Number(match[2]));
+   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start> end||start>=head.size||!head.size)return new Response(null,{status:416,headers:{'content-range':'bytes */'+head.size,'accept-ranges':'bytes','cache-control':'no-store'}});
+   end=Math.min(end,head.size-1);range={offset:start,length:end-start+1};status=206;
+   headers.set('content-range','bytes '+start+'-'+end+'/'+head.size);
+   headers.set('content-length',String(range.length));
+  }else headers.set('content-length',String(head.size));
+  const file=await env.AUDIO.get(key,range?{range}:undefined);
+  if(!file?.body)failure(404,'ไม่พบไฟล์เสียง');
+  return new Response(file.body,{status,headers});
+ }
+ if((m==='PUT'||m==='DELETE')&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)\/audio$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT novel_id FROM chapters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตอน');
+  await own(db,c.novel_id,user);
+  if(!env.AUDIO)failure(503,'กรุณาเชื่อมพื้นที่เก็บไฟล์ Cloudflare R2 ก่อนอัปโหลด');
+  const key='chapters/'+cid+'.mp3';
+  if(m==='DELETE'){await env.AUDIO.delete(key);return reply({ok:true});}
+  const length=Number(req.headers.get('content-length')),type=(req.headers.get('content-type')||'').toLowerCase().split(';')[0];
+  if(!Number.isSafeInteger(length)||length<128||length>40*1024*1024)failure(413,'ไฟล์ MP3 ต้องมีขนาดระหว่าง 128 ไบต์ถึง 40 MB');
+  if(type!=='audio/mpeg'&&type!=='audio/mp3')failure(415,'กรุณาเลือกไฟล์ MP3 เท่านั้น');
+  if(!req.body)failure(400,'ไม่พบข้อมูลไฟล์');
+  await env.AUDIO.put(key,req.body,{httpMetadata:{contentType:'audio/mpeg'}});
+  return reply({ok:true,size:length});
+ }
  if(m==='GET'&&(x=p.match(/^\/api\/chapters\/(\d+)\/comments$/))){
   const user=await identity(db,req,true);await chapter(db,integer(x[1]),user);
   return reply({comments:await rows(db,'SELECT c.id,c.body,c.created_at,u.display_name author FROM comments c JOIN users u ON u.id=c.user_id WHERE c.chapter_id=? ORDER BY c.id DESC LIMIT 100',integer(x[1]))});
@@ -138,7 +183,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url),m=req.method;
  if(url.pathname==='/health')return reply({status:'ok'});
  if(url.pathname.startsWith('/api/')){
-  if(!['GET','POST','PUT'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT'});
+  if(!['GET','POST','PUT','DELETE'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT, DELETE'});
   if(m!=='GET'){
    const origin=req.headers.get('origin');
    if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
