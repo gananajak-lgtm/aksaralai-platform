@@ -64,7 +64,9 @@ function say(t){
  utterance.onerror=function(e){if(t!==ticket||!active||e.error==='interrupted'||e.error==='canceled')return;active=false;checkpoint();status();toast('ไม่สามารถอ่านด้วยเสียงนี้ได้');};
  engine.speak(utterance);
 }
-function playFromCheckpoint(){ticket++;engine.cancel();active=true;paused=false;say(ticket);}
+// Android TTS engines may silently drop speak() when it immediately follows cancel().
+// Defer the replacement utterance to give the engine time to release its old queue.
+function playFromCheckpoint(){ticket++;var current=ticket;active=true;paused=false;engine.cancel();status();setTimeout(function(){if(active&&!paused&&current===ticket)say(current);},200);}
 button.onclick=function(){
  if(!active){playFromCheckpoint();return;}
  if(paused){playFromCheckpoint();return;}
@@ -73,7 +75,7 @@ button.onclick=function(){
  else{paused=true;ticket++;checkpoint();engine.cancel();status();}
 };
 document.getElementById('stop').onclick=function(){checkpoint();ticket++;engine.cancel();active=false;paused=false;status();};
-restartButton.onclick=function(){ticket++;engine.cancel();index=0;clearCheckpoint();active=true;paused=false;say(ticket);};
+restartButton.onclick=function(){index=0;clearCheckpoint();playFromCheckpoint();};
 rate.onchange=function(){speed=Number(rate.value);localStorage.setItem('aksaralai.speed',String(speed));if(active)playFromCheckpoint();};
 voice.onchange=function(){if(active)playFromCheckpoint();};
 window.addEventListener('pagehide',saveBeforeExit);
