@@ -115,6 +115,36 @@ async function chapterMp3Uploader(chapterId){
   }catch(e){state.textContent=e.message;}finally{remove.disabled=false;}
  };
 }
+async function chapterTtsPreview(chapterId){
+ var section=document.getElementById('openai-tts-preview');
+ if(!section)return;
+ try{
+  var config=await api('/writer/tts-preview/status');
+  if(!config.enabled)return;
+  section.hidden=false;
+  var button=section.querySelector('[data-tts-preview]');
+  var status=section.querySelector('[data-tts-status]');
+  var player=section.querySelector('audio');
+  var currentUrl=null;
+  function update(n){button.disabled=n<=0;status.textContent='เหลือสิทธิ์ทดลอง '+n+' / 3 ครั้งวันนี้ (UTC) · ตัวอย่างภาษาไทยสั้น ๆ · ไม่บันทึกแทน MP3 ของตอน';}
+  update(config.remaining);
+  button.onclick=async function(){
+   if(!confirm('สร้างเสียง OpenAI ตัวอย่างสั้น ๆ 1 ครั้ง? การดำเนินการนี้มีค่า API ตามจริง'))return;
+   button.disabled=true;status.textContent='กำลังสร้างเสียงจาก OpenAI...';
+   try{
+    var r=await fetch('/api/writer/chapters/'+chapterId+'/tts/preview',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:'{}'});
+    if(!r.ok){var problem=await r.json();throw Error(problem.detail||'สร้างเสียงไม่สำเร็จ');}
+    var blob=await r.blob();
+    if(!blob.type.includes('audio')||blob.size<128)throw Error('ไฟล์เสียงที่ได้รับไม่ถูกต้อง');
+    if(currentUrl)URL.revokeObjectURL(currentUrl);
+    currentUrl=URL.createObjectURL(blob);
+    player.src=currentUrl;player.hidden=false;
+    await player.play().catch(function(){});
+    update(Number(r.headers.get('x-preview-remaining')||0));
+   }catch(e){var latest=await api('/writer/tts-preview/status').catch(function(){return null});if(latest?.enabled)update(latest.remaining);status.textContent=e.message;}
+  };
+ }catch(e){section.hidden=true;}
+}
 // Choose natural Thai phrase boundaries before splitting for the speech engine.
 // Avoid the previous 64-character cap: it added artificial pauses in the middle of sentences.
 function splitText(s){
@@ -266,10 +296,10 @@ async function editNovel(id){if(!user||user.role!=='writer')return go('auth');va
 async function editChapter(id){var o=await api('/chapters/'+id),c=o.chapter;chapterForm(c.novel_id,c);}
 function chapterForm(nid,chapter){
 var id=chapter?.id;
-app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><textarea name="body" required style="min-height:370px" maxlength="300000">'+esc(chapter?.body||'')+'</textarea><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button></p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
+app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><textarea name="body" required style="min-height:370px" maxlength="300000">'+esc(chapter?.body||'')+'</textarea><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button></p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="openai-tts-preview" style="margin-top:18px" hidden><h2>🎙️ ทดลองเสียง OpenAI</h2><p class="small">ทดสอบเสียงไทยตัวอย่างสั้น ๆ ก่อนสร้างระบบเสียงทั้งตอน · ใช้เครดิต API จริง · จำกัด 3 ครั้งต่อวันเฉพาะบัญชีที่ได้รับอนุญาต</p><button class="btn" type="button" data-tts-preview>ทดลองสร้างเสียง OpenAI</button><p class="small" data-tts-status></p><audio controls hidden style="width:100%" aria-label="ทดลองเสียง OpenAI"></audio><p class="small">เสียงบรรยายนี้สร้างด้วย AI</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
 var chapterEditor=document.querySelector('#chapterform textarea[name="body"]'),chapterCounter=document.getElementById('chapter-counter');
 function updateChapterCount(){var n=chapterEditor.value.length;chapterCounter.textContent='จำนวนตัวอักษร: '+n.toLocaleString('th-TH')+' / 300,000';}
-chapterEditor.addEventListener('input',updateChapterCount);updateChapterCount();if(id)chapterMp3Uploader(id);
+chapterEditor.addEventListener('input',updateChapterCount);updateChapterCount();if(id){chapterMp3Uploader(id);chapterTtsPreview(id);}
 document.getElementById('chapterform').onsubmit=async function(e){
 e.preventDefault();
 var form=e.target,buttons=Array.from(form.querySelectorAll('button[type="submit"]')),intent=e.submitter?.value||'draft',d=Object.fromEntries(new FormData(form)),chapterId=id;
