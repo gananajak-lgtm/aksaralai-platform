@@ -45,9 +45,11 @@ async function api(req,env){
  }
  if(p==='/api/login'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',1,24),password=str(d,'password',1,128);
-  const user=await query(db,'SELECT * FROM users WHERE username=?',username);
-  if(!user||!(await matches(password,user.passhash)))failure(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-  return reply({ok:true},200,{'set-cookie':await session(db,user.id)});
+  let user;try{user=await query(db,'SELECT * FROM users WHERE username=?',username);}catch(e){throw Object.assign(new Error('LOGIN_LOOKUP'),{code:'LOGIN_LOOKUP',cause:e});}
+  if(!user)failure(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  let valid;try{valid=await matches(password,user.passhash);}catch(e){throw Object.assign(new Error('LOGIN_VERIFY'),{code:'LOGIN_VERIFY',cause:e});}
+  if(!valid)failure(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  try{return reply({ok:true},200,{'set-cookie':await session(db,user.id)});}catch(e){throw Object.assign(new Error('LOGIN_SESSION'),{code:'LOGIN_SESSION',cause:e});}
  }
  if(p==='/api/logout'&&m==='POST'){const token=cookie(req);if(token)await run(db,'DELETE FROM sessions WHERE token_hash=?',await sha(token));return reply({ok:true},200,{'set-cookie':sessionCookie('',0)});}
  if(p==='/api/me'&&m==='GET')return reply({user:await identity(db,req)});
@@ -142,7 +144,7 @@ export default {async fetch(req,env){
    if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
    if(req.headers.get('sec-fetch-site')==='cross-site')return reply({detail:'Forbidden site'},403);
   }
-  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
+  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
  }
  if(!['GET','HEAD'].includes(m))return new Response('Method not allowed',{status:405});
  if(!env.ASSETS)return new Response('Missing static assets binding',{status:503});
