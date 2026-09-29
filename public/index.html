@@ -59,10 +59,7 @@ function pronunciationText(text,entries){
  }
  return out;
 }
-function initializeAudio(body,chapterId){');}).join('|'),'g');
- var table=new Map(sorted.map(function(e){return [e.word,e.sound];}));
- return output.replace(pattern,function(m){return table.get(m)||m;});
-}
+
 function initializeAudio(body,chapterId){
 var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var storageKey='aksaralai.tts.chapter.'+chapterId;
