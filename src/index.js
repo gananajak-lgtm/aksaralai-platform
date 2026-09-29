@@ -76,6 +76,50 @@ async function api(req,env){
   return reply({chapter:c,novel:{id:n.id,title:n.title},chapters});
  }
 
+ // Standalone MP3 studio: no chapter binding and no arbitrary access to the owner's API key.
+ // Each request is explicitly confirmed in the browser and limited in length; no three-use preview quota.
+ if(m==='POST'&&p==='/api/writer/tts/generate'){
+  const user=await author(db,req);
+  if(!env.OPENAI_API_KEY||!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'สร้างเสียง OpenAI ได้เฉพาะบัญชีผู้ดูแลที่กำหนด');
+  const d=await payload(req);
+  const input=str(d,'text',1,1500);
+  if(!input.trim())failure(400,'กรุณากรอกข้อความ');
+  const voices=new Set(['alloy','ash','ballad','coral','echo','fable','nova','onyx','sage','shimmer','verse','marin','cedar']);
+  const voice=d.voice||'marin';
+  if(typeof voice!=='string'||!voices.has(voice))failure(400,'เสียงที่เลือกไม่รองรับ');
+  const styles={
+   narrator:'Speak natural, clearly intelligible Thai as a professional audiobook narrator. Keep the original Thai words exactly; do not translate or add anything. Observe natural sentence pauses.',
+   mystery:'Read the text in natural Thai with a restrained mysterious storytelling tone. Articulate every Thai word accurately; no translation, no extra content or background sound.',
+   dramatic:'Read natural Thai with expressive yet controlled emotion appropriate for storytelling. Preserve the original words exactly; no translation or added dialogue.',
+   calm:'Read in natural, gentle, unhurried Thai with clear pronunciation and comfortable breathing pauses. Never translate or add words.'
+  };
+  const style=d.style||'narrator';
+  if(typeof style!=='string'||!Object.hasOwn(styles,style))failure(400,'รูปแบบการอ่านไม่ถูกต้อง');
+  const speed=d.speed===undefined?1:Number(d.speed);
+  if(!Number.isFinite(speed)||speed<0.75||speed>1.25)failure(400,'ความเร็วต้องอยู่ระหว่าง 0.75–1.25 เท่า');
+  let response;
+  try{
+   response=await fetch('https://api.openai.com/v1/audio/speech',{
+    method:'POST',
+    headers:{'authorization':'Bearer '+env.OPENAI_API_KEY,'content-type':'application/json'},
+    body:JSON.stringify({model:'gpt-4o-mini-tts',voice,input,instructions:styles[style],speed,response_format:'mp3'})
+   });
+  }catch(e){console.error('Standalone TTS upstream unavailable',String(e));failure(502,'เชื่อมต่อ OpenAI ไม่สำเร็จ กรุณาลองอีกครั้ง');}
+  if(!response.ok){
+   let providerCode='';
+   try{const body=await response.json();if(typeof body?.error?.code==='string')providerCode=body.error.code;}catch(_){}
+   let detail='OpenAI ยังสร้างเสียงไม่ได้ (HTTP '+response.status+')';
+   if(response.status===401)detail='API Key ไม่ถูกต้องหรือถูกเพิกถอน (HTTP 401)';
+   else if(response.status===403)detail='บัญชี OpenAI API ไม่มีสิทธิ์ใช้โมเดลนี้ (HTTP 403)';
+   else if(response.status===429&&providerCode==='insufficient_quota')detail='เครดิต OpenAI API ไม่เพียงพอ (HTTP 429)';
+   else if(response.status===429)detail='OpenAI จำกัดอัตราการสร้างเสียงชั่วคราว (HTTP 429)';
+   else if(response.status===400)detail='OpenAI ไม่รับข้อความหรือพารามิเตอร์นี้ ลองแบ่งข้อความให้สั้นลง (HTTP 400)';
+   console.error('Standalone TTS upstream status',response.status,providerCode==='insufficient_quota'?'insufficient_quota':'error');
+   failure(502,detail);
+  }
+  return new Response(response.body,{status:200,headers:{'content-type':'audio/mpeg','cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'attachment; filename="aksaralai-openai.mp3"'}});
+ }
+
  // Preview only: fail closed unless a specific existing writer is explicitly configured.
  // OpenAI is called server-side only; the API key never reaches the browser.
  if(m==='GET'&&p==='/api/writer/tts-preview/status'){
