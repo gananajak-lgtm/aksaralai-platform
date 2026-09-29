@@ -29,6 +29,92 @@ async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerH
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
 function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><details class="panel" style="margin:10px 0"><summary>🗣️ แก้คำอ่านที่ออกเสียงผิด</summary><p class="small">เพิ่มคำที่อ่านผิดและคำอ่านที่ต้องการ เก็บไว้ในมือถือเครื่องนี้เท่านั้น ไม่แก้เนื้อหานิยายต้นฉบับ</p><div class="controls"><input id="pron-word" maxlength="80" placeholder="คำในนิยาย" aria-label="คำในนิยาย"><input id="pron-sound" maxlength="120" placeholder="ต้องการให้อ่านว่า" aria-label="คำอ่านใหม่"><button class="btn subtle" type="button" id="pron-add">เพิ่มคำอ่าน</button></div><div class="small" id="pron-entries"></div></details><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
 // Split by Thai word boundaries, never at an arbitrary character inside a word.
+// Native HTML audio can request a media session for Android lock-screen playback.
+// Live speechSynthesis stays available as the fallback for chapters without MP3.
+async function chapterMp3(chapterId,title,novelTitle){
+ var section=document.getElementById('mp3-player'),status=document.getElementById('mp3-status'),element=document.getElementById('mp3-audio');
+ if(!section||!element)return;
+ try{
+  var details=await api('/chapters/'+chapterId+'/audio/status');
+  if(!section.isConnected||!details.available)return;
+  section.hidden=false;status.textContent='พร้อมฟัง MP3 จากตอนนี้';
+  var key='aksaralai.mp3.position.'+chapterId;
+  element.src='/api/chapters/'+chapterId+'/audio';
+  element.addEventListener('loadedmetadata',function(){
+   try{var pos=Number(localStorage.getItem(key)||0);
+    if(Number.isFinite(pos)&&pos>0&&pos<element.duration-3)element.currentTime=pos;
+   }catch(e){}
+  },{once:true});
+  element.addEventListener('timeupdate',function(){
+   try{localStorage.setItem(key,String(element.currentTime));}catch(e){}
+  });
+  element.addEventListener('ended',function(){
+   try{localStorage.removeItem(key);}catch(e){}
+   status.textContent='ฟัง MP3 จบตอนแล้ว';
+  });
+  element.addEventListener('error',function(){status.textContent='ไม่สามารถเล่น MP3 นี้ได้ กรุณาลองเปิดใหม่หรือแจ้งนักเขียน';});
+  if('mediaSession'in navigator){
+   try{navigator.mediaSession.metadata=new MediaMetadata({title:title,artist:novelTitle,album:'อักษราลัย'});}catch(e){}
+   var bind=function(name,fn){try{navigator.mediaSession.setActionHandler(name,fn);}catch(e){}};
+   bind('play',function(){element.play().catch(function(){});});
+   bind('pause',function(){element.pause();});
+   bind('seekbackward',function(d){element.currentTime=Math.max(0,element.currentTime-(d.seekOffset||10));});
+   bind('seekforward',function(d){element.currentTime=Math.min(element.duration||Infinity,element.currentTime+(d.seekOffset||10));});
+   bind('seekto',function(d){if(Number.isFinite(d.seekTime))element.currentTime=d.seekTime;});
+  }
+  element.addEventListener('play',function(){
+   var ttsStop=document.getElementById('stop');if(ttsStop&&ttsStop.onclick)ttsStop.onclick();
+   if('mediaSession'in navigator)try{navigator.mediaSession.playbackState='playing';}catch(e){}
+   status.textContent='กำลังฟัง MP3 · ลองล็อกหน้าจอได้';
+  });
+  element.addEventListener('pause',function(){
+   if('mediaSession'in navigator)try{navigator.mediaSession.playbackState='paused';}catch(e){}
+  });
+  var oldController=audio;
+  audio={kind:'mp3',stop:function(){
+   try{localStorage.setItem(key,String(element.currentTime));}catch(e){}
+   element.pause();element.removeAttribute('src');element.load();
+   if('mediaSession'in navigator){
+    ['play','pause','seekbackward','seekforward','seekto'].forEach(function(k){try{navigator.mediaSession.setActionHandler(k,null);}catch(e){}});
+    try{navigator.mediaSession.playbackState='none';}catch(e){}
+   }
+   if(oldController&&typeof oldController.stop==='function')oldController.stop();
+  }};
+ }catch(e){if(section.isConnected)section.hidden=true;}
+}
+async function chapterMp3Uploader(chapterId){
+ var box=document.getElementById('chapter-mp3-uploader');if(!box)return;
+ var input=box.querySelector('input[type="file"]'),button=box.querySelector('[data-upload]'),remove=box.querySelector('[data-remove]'),state=box.querySelector('[data-audio-status]');
+ async function refreshAudio(){
+  try{var result=await api('/chapters/'+chapterId+'/audio/status');
+   if(!result.configured){state.textContent='ยังไม่ได้เชื่อมพื้นที่เก็บไฟล์ Cloudflare R2';button.disabled=true;remove.hidden=true;return;}
+   button.disabled=false;remove.hidden=!result.available;
+   state.textContent=result.available?'มีไฟล์ MP3 แล้ว ('+(result.size/1048576).toFixed(1)+' MB) · อัปโหลดใหม่เพื่อแทนที่':'ยังไม่มีไฟล์เสียงสำหรับตอนนี้';
+  }catch(e){state.textContent='ตรวจสอบสถานะไฟล์เสียงไม่สำเร็จ';}
+ }
+ await refreshAudio();
+ button.onclick=async function(){
+  var file=input.files&&input.files[0];
+  if(!file){state.textContent='กรุณาเลือกไฟล์ MP3';return;}
+  if(!/\\.mp3$/i.test(file.name)||file.size<128||file.size>40*1024*1024){state.textContent='กรุณาใช้ไฟล์ .mp3 ขนาดไม่เกิน 40 MB';return;}
+  button.disabled=true;state.textContent='กำลังอัปโหลด MP3... กรุณาอย่าปิดหน้านี้';
+  try{
+   var response=await fetch('/api/writer/chapters/'+chapterId+'/audio',{method:'PUT',credentials:'same-origin',headers:{'content-type':'audio/mpeg'},body:file});
+   var result=await response.json();
+   if(!response.ok)throw Error(result.detail||'อัปโหลดไม่สำเร็จ');
+   input.value='';await refreshAudio();toast('อัปโหลด MP3 สำเร็จ');
+  }catch(e){state.textContent=e.message;}finally{button.disabled=false;}
+ };
+ remove.onclick=async function(){
+  if(!confirm('ลบไฟล์ MP3 ของตอนนี้? เนื้อหานิยายจะไม่ถูกลบ'))return;
+  remove.disabled=true;
+  try{
+   var response=await fetch('/api/writer/chapters/'+chapterId+'/audio',{method:'DELETE',credentials:'same-origin'});
+   var result=await response.json();if(!response.ok)throw Error(result.detail||'ลบไม่สำเร็จ');
+   await refreshAudio();toast('ลบ MP3 แล้ว');
+  }catch(e){state.textContent=e.message;}finally{remove.disabled=false;}
+ };
+}
 // Choose natural Thai phrase boundaries before splitting for the speech engine.
 // Avoid the previous 64-character cap: it added artificial pauses in the middle of sentences.
 function splitText(s){
@@ -206,7 +292,7 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-go]'
 window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installPrompt=e;document.getElementById('install').hidden=false;});
 document.getElementById('install').onclick=async function(){if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.getElementById('install').hidden=true;}};
 window.addEventListener('hashchange',function(){var a=location.hash.slice(1).split('/');if(a[0]!==current.route||a[1]!==current.id)go(a[0]||'home',a[1]);});
-window.addEventListener('pagehide',stop);
+window.addEventListener('pagehide',function(){if(audio&&audio.kind==='mp3')return;stop();});
 if('serviceWorker'in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});
 refresh().then(function(){var a=location.hash.slice(1).split('/');go(a[0]||'home',a[1]);}).catch(function(){go('home');});
 })();
