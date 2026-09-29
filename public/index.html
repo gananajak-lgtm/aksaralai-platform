@@ -28,11 +28,28 @@ async function shelf(){if(!user){app.innerHTML='<div class="empty">กรุณ�
 async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerHTML='<div class="panel" style="margin-top:25px"><div class="row"><div class="cover" style="min-width:170px;height:190px;--cover:'+esc(n.cover_color)+'">📖</div><div style="flex:1"><span class="chip">'+esc(n.genre)+'</span><h1>'+esc(n.title)+'</h1><p>เขียนโดย '+esc(o.author)+'</p><p>'+esc(n.summary)+'</p><div class="controls"><button class="btn" id="begin">เริ่มอ่าน</button><button class="btn subtle" id="save">'+(o.saved?'✓ อยู่ในชั้นหนังสือ':'＋ เพิ่มเข้าชั้นหนังสือ')+'</button>'+(o.is_owner?'<button class="btn ghost" data-go="edit" data-id="'+n.id+'">จัดการเรื่อง</button>':'')+'</div></div></div><h2>สารบัญ · '+o.chapters.length+' ตอน</h2><div class="chapter-list">'+(o.chapters.length?o.chapters.map(function(c){return '<div class="chapter-item"><span>'+esc(c.position)+'. '+esc(c.title)+(c.published?'':' · ฉบับร่าง')+'</span><button class="btn subtle" data-go="read" data-id="'+c.id+'">อ่าน</button></div>'}).join(''):'<p class="empty">ยังไม่มีตอนให้อ่าน</p>')+'</div></div>';document.getElementById('begin').onclick=function(){if(o.chapters.length)go('read',o.progress?.chapter_id||o.chapters[0].id);else toast('ยังไม่มีตอนให้อ่าน');};document.getElementById('save').onclick=async function(){if(!user){go('auth');return;}var r=await call(function(){return api('/novels/'+id+'/shelf','POST',{})});if(r)go('novel',id);};}
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
 function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
-function splitText(s){var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],a=[];pieces.forEach(function(p){if(!p.trim()){if(a.length)a[a.length-1]+=p;return;}while(p.length>64){var end=p.lastIndexOf(' ',64);if(end<20)end=64;a.push(p.slice(0,end));p=p.slice(end);}if(p)a.push(p);});return a;}
+// Split by Thai word boundaries, never at an arbitrary character inside a word.
+function splitText(s){
+ var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],out=[],segmenter;
+ try{if(typeof Intl!=='undefined'&&Intl.Segmenter)segmenter=new Intl.Segmenter('th',{granularity:'word'});}catch(e){}
+ pieces.forEach(function(p){
+  if(!p.trim()){if(out.length)out[out.length-1]+=p;return;}
+  if(p.length<=64){out.push(p);return;}
+  var words=segmenter?Array.from(segmenter.segment(p),function(x){return x.segment;}):p.match(/\S+\s*|\s+/g)||[p];
+  // Without a Thai segmenter keep long words whole rather than corrupting pronunciation.
+  var buffer='';
+  words.forEach(function(word){if(buffer&&buffer.length+word.length>64){out.push(buffer);buffer='';}buffer+=word;});
+  if(buffer)out.push(buffer);
+ });
+ return out;
+}
+// Keep display text original. Clean punctuation only in the text sent to the voice engine.
+function speechText(s){return s.replace(/[“”„‟«»「」『』"']/g,' ').replace(/[…⋯]/g,' ').replace(/\.{2,}/g,' ').replace(/[()\[\]{}]/g,' ').replace(/[\u200b\u200c\u200d\ufeff]/g,'').replace(/\s+/g,' ').trim();}
+
 function initializeAudio(body,chapterId){
 var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var storageKey='aksaralai.tts.chapter.'+chapterId;
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),64]);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-word-v2']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
@@ -58,8 +75,12 @@ function say(t){
  if(!active||paused||t!==ticket)return;
  if(index>=parts.length){active=false;index=0;offset=0;clearCheckpoint();try{var last=JSON.parse(localStorage.getItem('aksaralai.tts.last')||'null');if(last?.chapterId===String(chapterId))localStorage.removeItem('aksaralai.tts.last');}catch(e){}box.querySelectorAll('.active').forEach(function(e){e.classList.remove('active')});status();return;}
  checkpoint();mark();status();
- var spokenFrom=offset;var utterance=new SpeechSynthesisUtterance(parts[index].slice(spokenFrom));utterance.lang='th-TH';utterance.rate=speed;
- utterance.onboundary=function(e){if(t!==ticket||!active||paused)return;if(Number.isInteger(e.charIndex)&&e.charIndex>0){offset=Math.min(parts[index].length-1,spokenFrom+e.charIndex);checkpoint();}};
+ var spokenFrom=offset,raw=parts[index].slice(spokenFrom),clean=speechText(raw);
+ if(!clean){index++;offset=0;checkpoint();say(t);return;}
+ var utterance=new SpeechSynthesisUtterance(clean);utterance.lang='th-TH';utterance.rate=speed;
+ // Speech boundary indices refer to the synthesized string, not the original novel.
+ // Use them only when the spoken text matches the original exactly.
+ if(raw===clean)utterance.onboundary=function(e){if(t!==ticket||!active||paused)return;if(Number.isInteger(e.charIndex)&&e.charIndex>0){offset=Math.min(parts[index].length-1,spokenFrom+e.charIndex);checkpoint();}};
  var selected=voices().find(function(v){return v.voiceURI===voice.value});if(selected)utterance.voice=selected;
  utterance.onend=function(){if(t!==ticket||!active)return;index++;offset=0;checkpoint();say(t);};
  utterance.onerror=function(e){if(t!==ticket||!active||e.error==='interrupted'||e.error==='canceled')return;active=false;checkpoint();status();toast('ไม่สามารถอ่านด้วยเสียงนี้ได้');};
