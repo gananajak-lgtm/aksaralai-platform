@@ -70,13 +70,13 @@ async function api(req,env){
   return reply({novel:n,author:person.display_name,chapters,saved,progress,is_owner:owner});
  }
  if(m==='GET'&&(x=p.match(/^\/api\/chapters\/(\d+)$/))){
-  const user=await identity(db,req),{c,n,owner}=await chapter(db,integer(x[1]),user);
+  const user=await identity(db,req,true),{c,n,owner}=await chapter(db,integer(x[1]),user);
   if(user)await run(db,'INSERT INTO progress(user_id,novel_id,chapter_id,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,novel_id) DO UPDATE SET chapter_id=excluded.chapter_id,updated_at=excluded.updated_at',user.id,n.id,c.id,clock());
   const chapters=await rows(db,'SELECT id,title,position FROM chapters WHERE novel_id=? '+(owner?'':'AND published=1 ')+'ORDER BY position',n.id);
   return reply({chapter:c,novel:{id:n.id,title:n.title},chapters});
  }
  if(m==='GET'&&(x=p.match(/^\/api\/chapters\/(\d+)\/comments$/))){
-  const user=await identity(db,req);await chapter(db,integer(x[1]),user);
+  const user=await identity(db,req,true);await chapter(db,integer(x[1]),user);
   return reply({comments:await rows(db,'SELECT c.id,c.body,c.created_at,u.display_name author FROM comments c JOIN users u ON u.id=c.user_id WHERE c.chapter_id=? ORDER BY c.id DESC LIMIT 100',integer(x[1]))});
  }
  if(m==='POST'&&(x=p.match(/^\/api\/chapters\/(\d+)\/comments$/))){
