@@ -160,3 +160,59 @@ test('OpenAI preview returns safe actionable diagnostics without leaking provide
   assert.equal((await h.api('/writer/tts-preview/status')).remaining,2);
  }finally{globalThis.fetch=original;}
 });
+
+test('standalone OpenAI studio supports owner text, voice and MP3 without consuming preview attempts',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'adminvoice'});
+ assert.equal((await h.api('/register','POST',{username:'adminvoice',display_name:'Owner',password:'long-password-06',role:'writer'})).status,201);
+ const ownerCookie=h.getCookie();
+ const good={text:'สวัสดีค่ะ นี่เป็นเสียงบรรยายที่ฉันต้องการดาวน์โหลดไปใช้งานอื่น',voice:'cedar',style:'mystery',speed:0.85};
+ assert.equal((await h.api('/writer/tts/generate','POST',{...good,voice:'arbitrary-voice'})).status,400);
+ assert.equal((await h.api('/writer/tts/generate','POST',{...good,style:'arbitrary-style'})).status,400);
+ assert.equal((await h.api('/writer/tts/generate','POST',{...good,text:'ก'.repeat(1501)})).status,400);
+ assert.equal((await h.api('/writer/tts/generate','POST',{...good,speed:3})).status,400);
+ h.clear();
+ assert.equal((await h.api('/writer/tts/generate','POST',good)).status,401);
+ assert.equal((await h.api('/register','POST',{username:'other_voice',display_name:'Other',password:'long-password-07',role:'writer'})).status,201);
+ assert.equal((await h.api('/writer/tts/generate','POST',good)).status,403);
+ h.setCookie(ownerCookie);
+ const original=globalThis.fetch;
+ let count=0;
+ globalThis.fetch=async(url,opts)=>{
+  count++;
+  assert.equal(url,'https://api.openai.com/v1/audio/speech');
+  assert.equal(opts.headers.authorization,'Bearer fake-test-key');
+  const body=JSON.parse(opts.body);
+  assert.equal(body.model,'gpt-4o-mini-tts');
+  assert.equal(body.input,good.text);
+  assert.equal(body.voice,'cedar');
+  assert.equal(body.speed,0.85);
+  assert.match(body.instructions,/mysterious/);
+  assert.equal(body.response_format,'mp3');
+  return new Response(new Uint8Array(250),{status:200,headers:{'content-type':'audio/mpeg'}});
+ };
+ try{
+  for(let i=0;i<4;i++){
+   const req=new Request('https://example.com/api/writer/tts/generate',{method:'POST',headers:{cookie:ownerCookie,origin:'https://example.com','content-type':'application/json'},body:JSON.stringify(good)});
+   const response=await worker.fetch(req,h.env);
+   assert.equal(response.status,200);
+   assert.equal(response.headers.get('content-type'),'audio/mpeg');
+   assert.match(response.headers.get('content-disposition'),/attachment/);
+   assert.equal((await response.arrayBuffer()).byteLength,250);
+  }
+  assert.equal(count,4);
+  assert.equal((await h.api('/writer/tts-preview/status')).remaining,3);
+ }finally{globalThis.fetch=original;}
+});
+
+test('standalone OpenAI studio does not leak provider responses when credits are unavailable',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'adminfail'});
+ assert.equal((await h.api('/register','POST',{username:'adminfail',display_name:'Owner',password:'long-password-08',role:'writer'})).status,201);
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:{code:'insufficient_quota',message:'do not reveal this provider message'}}),{status:429,headers:{'content-type':'application/json'}});
+ try{
+  const r=await h.api('/writer/tts/generate','POST',{text:'สวัสดีครับ',voice:'marin',style:'narrator',speed:1});
+  assert.equal(r.status,502);
+  assert.match(r.detail,/เครดิต/);
+  assert.equal(JSON.stringify(r).includes('do not reveal this provider message'),false);
+ }finally{globalThis.fetch=original;}
+});
