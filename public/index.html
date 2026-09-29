@@ -69,7 +69,7 @@ function speechText(s){
   .replace(/[()\[\]{}]/g,' ')
   .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
   // Keep sentence spacing and a pause where the original manuscript has a line break.
-  .replace(/\r?\n+/g,'。 ')
+  .replace(/\r?\n+/g,' ')
   .replace(/[ \t]{2,}/g,' ')
   .trim();
 }
@@ -138,7 +138,7 @@ function say(t){
  // Use them only when the spoken text matches the original exactly.
  if(raw===clean)utterance.onboundary=function(e){if(t!==ticket||!active||paused)return;if(Number.isInteger(e.charIndex)&&e.charIndex>0){offset=Math.min(parts[index].length-1,spokenFrom+e.charIndex);checkpoint();}};
  var selected=voices().find(function(v){return v.voiceURI===voice.value});if(selected)utterance.voice=selected;
- utterance.onend=function(){if(t!==ticket||!active)return;index++;offset=0;checkpoint();say(t);};
+ utterance.onend=function(){if(t!==ticket||!active)return;var paragraphEnd=/\n\s*$/.test(parts[index]);index++;offset=0;checkpoint();if(paragraphEnd){setTimeout(function(){if(t===ticket&&active&&!paused)say(t);},320);}else say(t);};
  utterance.onerror=function(e){if(t!==ticket||!active||e.error==='interrupted'||e.error==='canceled')return;active=false;checkpoint();status();toast('ไม่สามารถอ่านด้วยเสียงนี้ได้');};
  engine.speak(utterance);
 }
