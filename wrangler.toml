@@ -16,3 +16,8 @@ binding = "DB"
 database_name = "aksaralai-db"
 database_id = "31badb5e-4c01-4873-bc83-2c2aedabd39e"
 migrations_dir = "migrations"
+
+# Private MP3 storage — only the authenticated Worker can read/write audio.
+[[r2_buckets]]
+binding = "AUDIO"
+bucket_name = "aksaralai-audio"
