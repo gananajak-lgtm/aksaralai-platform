@@ -29,22 +29,50 @@ async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerH
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
 function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><details class="panel" style="margin:10px 0"><summary>🗣️ แก้คำอ่านที่ออกเสียงผิด</summary><p class="small">เพิ่มคำที่อ่านผิดและคำอ่านที่ต้องการ เก็บไว้ในมือถือเครื่องนี้เท่านั้น ไม่แก้เนื้อหานิยายต้นฉบับ</p><div class="controls"><input id="pron-word" maxlength="80" placeholder="คำในนิยาย" aria-label="คำในนิยาย"><input id="pron-sound" maxlength="120" placeholder="ต้องการให้อ่านว่า" aria-label="คำอ่านใหม่"><button class="btn subtle" type="button" id="pron-add">เพิ่มคำอ่าน</button></div><div class="small" id="pron-entries"></div></details><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
 // Split by Thai word boundaries, never at an arbitrary character inside a word.
+// Choose natural Thai phrase boundaries before splitting for the speech engine.
+// Avoid the previous 64-character cap: it added artificial pauses in the middle of sentences.
 function splitText(s){
- var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],out=[],segmenter;
+ var out=[],segmenter,max=220,preferred=110;
  try{if(typeof Intl!=='undefined'&&Intl.Segmenter)segmenter=new Intl.Segmenter('th',{granularity:'word'});}catch(e){}
- pieces.forEach(function(p){
-  if(!p.trim()){if(out.length)out[out.length-1]+=p;return;}
-  if(p.length<=64){out.push(p);return;}
-  var words=segmenter?Array.from(segmenter.segment(p),function(x){return x.segment;}):p.match(/\S+\s*|\s+/g)||[p];
-  // Without a Thai segmenter keep long words whole rather than corrupting pronunciation.
-  var buffer='';
-  words.forEach(function(word){if(buffer&&buffer.length+word.length>64){out.push(buffer);buffer='';}buffer+=word;});
-  if(buffer)out.push(buffer);
+ // Preserve paragraph endings in the source segments for speech pacing.
+ var paragraphs=s.match(/[^\n]+(?:\n+|$)|\n+/g)||[];
+ paragraphs.forEach(function(paragraph){
+  if(!paragraph.trim()){if(out.length)out[out.length-1]+=paragraph;return;}
+  var rest=paragraph;
+  while(rest.length>max){
+   var stop=-1;
+   // Thai spaces, commas, and punctuation are stronger boundaries than word breaks.
+   for(var i=preferred;i<=max&&i<rest.length;i++){
+    if(/[ \t\n,，;；:：!?！？。]/.test(rest[i-1]))stop=i;
+   }
+   if(stop<preferred){
+    if(segmenter){
+     for(var unit of segmenter.segment(rest)){
+      var end=unit.index+unit.segment.length;
+      if(end>max)break;
+      if(end>=preferred)stop=end;
+     }
+    }
+   }
+   // On browsers without Thai word segmentation, preserve a long token whole.
+   if(stop<1){out.push(rest);rest='';break;}
+   out.push(rest.slice(0,stop));rest=rest.slice(stop);
+  }
+  if(rest)out.push(rest);
  });
  return out;
 }
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
-function speechText(s){return s.replace(/[“”„‟«»「」『』"']/g,' ').replace(/[…⋯]/g,' ').replace(/\.{2,}/g,' ').replace(/[()\[\]{}]/g,' ').replace(/[\u200b\u200c\u200d\ufeff]/g,'').replace(/\s+/g,' ').trim();}
+function speechText(s){
+ return s.replace(/[“”„‟«»「」『』"']/g,' ')
+  .replace(/[…⋯]|\.{2,}/g,' ')
+  .replace(/[()\[\]{}]/g,' ')
+  .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
+  // Keep sentence spacing and a pause where the original manuscript has a line break.
+  .replace(/\r?\n+/g,'。 ')
+  .replace(/[ \t]{2,}/g,' ')
+  .trim();
+}
 
 // Reader-controlled pronunciation replacements; no manuscript changes or external requests.
 function pronunciationEntries(){
@@ -77,7 +105,7 @@ pronAdd.onclick=function(){
  pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
 };
 showPronunciations();
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-word-v2']);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-phrases-v3']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
