@@ -83,3 +83,26 @@ test('Android restart does not speak before its canceled queue settles',()=>{
  assert.equal(h.spoken.length,2);
  h.flush();assert.equal(h.spoken.length,3);
 });
+
+test('onboundary saves speech offset and resume reads from that word, not chapter start',()=>{
+ const local=new Map(),session=new Map();
+ const h=harness(local,session),body='เรื่องราวตอนต้นที่กำลังอ่านและยังไม่จบประโยค!';
+ h.initialize(body,123);
+ h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken[0].text,body);
+ h.spoken[0].onboundary({charIndex:14});
+ assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.123')).offset,14);
+ h.els.get('speak').onclick();
+ h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken.at(-1).text,body.slice(14));
+ const reloaded=harness(local,session);reloaded.initialize(body,123);
+ reloaded.els.get('speak').onclick();reloaded.flush();
+ assert.equal(reloaded.spoken[0].text,body.slice(14));
+});
+test('long unpunctuated text is split into brief checkpoints on Thai speech engines without boundaries',()=>{
+ const h=harness(new Map(),new Map()),body='ตัวอักษร'.repeat(70);
+ const chunks=vm.runInNewContext(speechCode+'\nsplitText',h.context)(body);
+ assert.ok(chunks.length>=4);
+ assert.ok(chunks.every(x=>x.length<=64),'no speech segment should exceed 64 characters');
+ assert.equal(chunks.join(''),body);
+});
