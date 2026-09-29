@@ -102,8 +102,8 @@ test('onboundary saves speech offset and resume reads from that word, not chapte
 test('long unpunctuated text is split into brief checkpoints on Thai speech engines without boundaries',()=>{
  const h=harness(new Map(),new Map()),body='ตัวอักษร'.repeat(70);
  const chunks=vm.runInNewContext(speechCode+'\nsplitText',h.context)(body);
- assert.ok(chunks.length>=4);
- assert.ok(chunks.every(x=>x.length<=64),'no speech segment should exceed 64 characters');
+ assert.ok(chunks.length>=2);
+ assert.ok(chunks.every(x=>x.length<=220),'Thai words should be grouped into longer natural phrases');
  assert.equal(chunks.join(''),body);
 });
 
@@ -147,4 +147,23 @@ test('longest pronunciation rule takes precedence without cascading substitution
  {word:'อะ',sound:'ไม่ควรแทนซ้ำ'}
  ]);
  assert.equal(text,'ชาวอิน-ทฺรา-วะ-ดีพบอะ');
+});
+
+test('Thai prose is not chopped at 64 characters when the sentence has natural pauses',()=>{
+ const h=harness(new Map(),new Map());
+ const split=vm.runInNewContext(speechCode+'\nsplitText',h.context);
+ const body='เขาก้าวเข้าไปในป่าที่มืดสนิท โดยมีเสียงลมพัดผ่านใบไม้เบา ๆ ก่อนจะหยุดยืนเพื่อฟังเสียงเรียกจากที่ไกลออกไปและหันมามองผู้ร่วมทางด้วยความสงสัย';
+ const parts=split(body);
+ assert.deepEqual(parts,[body]);
+});
+test('paragraph breaks retain a pause before the next spoken chunk, without saying punctuation aloud',()=>{
+ const h=harness(new Map(),new Map());
+ const body='บรรทัดแรก\nบรรทัดที่สอง';
+ h.initialize(body,202);
+ h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken[0].text,'บรรทัดแรก');
+ h.spoken[0].onend();
+ assert.equal(h.spoken.length,1,'do not immediately read the next paragraph');
+ h.flush();
+ assert.equal(h.spoken[1].text,'บรรทัดที่สอง');
 });
