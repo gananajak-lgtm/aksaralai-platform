@@ -27,7 +27,7 @@ async function refresh(){var res=await api('/me');user=res.user;updateNav();}
 async function shelf(){if(!user){app.innerHTML='<div class="empty">กรุณาเข้าสู่ระบบก่อนเปิดชั้นหนังสือ <button class="btn" data-go="auth">เข้าสู่ระบบ</button></div>';return;}var o=await api('/shelf');app.innerHTML='<div class="toolbar"><h1>ชั้นหนังสือของฉัน</h1></div><div class="grid">'+(o.novels.length?o.novels.map(card).join(''):'<div class="empty">ยังไม่มีเรื่องในชั้นหนังสือ</div>')+'</div>';}
 async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerHTML='<div class="panel" style="margin-top:25px"><div class="row"><div class="cover" style="min-width:170px;height:190px;--cover:'+esc(n.cover_color)+'">📖</div><div style="flex:1"><span class="chip">'+esc(n.genre)+'</span><h1>'+esc(n.title)+'</h1><p>เขียนโดย '+esc(o.author)+'</p><p>'+esc(n.summary)+'</p><div class="controls"><button class="btn" id="begin">เริ่มอ่าน</button><button class="btn subtle" id="save">'+(o.saved?'✓ อยู่ในชั้นหนังสือ':'＋ เพิ่มเข้าชั้นหนังสือ')+'</button>'+(o.is_owner?'<button class="btn ghost" data-go="edit" data-id="'+n.id+'">จัดการเรื่อง</button>':'')+'</div></div></div><h2>สารบัญ · '+o.chapters.length+' ตอน</h2><div class="chapter-list">'+(o.chapters.length?o.chapters.map(function(c){return '<div class="chapter-item"><span>'+esc(c.position)+'. '+esc(c.title)+(c.published?'':' · ฉบับร่าง')+'</span><button class="btn subtle" data-go="read" data-id="'+c.id+'">อ่าน</button></div>'}).join(''):'<p class="empty">ยังไม่มีตอนให้อ่าน</p>')+'</div></div>';document.getElementById('begin').onclick=function(){if(o.chapters.length)go('read',o.progress?.chapter_id||o.chapters[0].id);else toast('ยังไม่มีตอนให้อ่าน');};document.getElementById('save').onclick=async function(){if(!user){go('auth');return;}var r=await call(function(){return api('/novels/'+id+'/shelf','POST',{})});if(r)go('novel',id);};}
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
-function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
+function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><details class="panel" style="margin:10px 0"><summary>🗣️ แก้คำอ่านที่ออกเสียงผิด</summary><p class="small">เพิ่มคำที่อ่านผิดและคำอ่านที่ต้องการ เก็บไว้ในมือถือเครื่องนี้เท่านั้น ไม่แก้เนื้อหานิยายต้นฉบับ</p><div class="controls"><input id="pron-word" maxlength="80" placeholder="คำในนิยาย" aria-label="คำในนิยาย"><input id="pron-sound" maxlength="120" placeholder="ต้องการให้อ่านว่า" aria-label="คำอ่านใหม่"><button class="btn subtle" type="button" id="pron-add">เพิ่มคำอ่าน</button></div><div class="small" id="pron-entries"></div></details><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
 // Split by Thai word boundaries, never at an arbitrary character inside a word.
 function splitText(s){
  var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],out=[],segmenter;
@@ -46,9 +46,42 @@ function splitText(s){
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
 function speechText(s){return s.replace(/[“”„‟«»「」『』"']/g,' ').replace(/[…⋯]/g,' ').replace(/\.{2,}/g,' ').replace(/[()\[\]{}]/g,' ').replace(/[\u200b\u200c\u200d\ufeff]/g,'').replace(/\s+/g,' ').trim();}
 
+// Reader-controlled pronunciation replacements; no manuscript changes or external requests.
+function pronunciationEntries(){
+ try{var v=JSON.parse(localStorage.getItem('aksaralai.tts.pronunciations')||'[]');return Array.isArray(v)?v.filter(function(x){return x&&typeof x.word==='string'&&typeof x.sound==='string'&&x.word&&x.sound;}).slice(0,100):[];}catch(e){return [];}
+}
+function pronunciationText(text,entries){
+ var output=text;
+ // Longer words first, so a short nickname does not replace part of a full name first.
+ entries.slice().sort(function(a,b){return b.word.length-a.word.length;}).forEach(function(e){
+  if(!e.word||!e.sound)return;
+  // Do not repeatedly replace earlier substitutions: replacements are single-pass tokens.
+ });
+ if(!entries.length)return output;
+ var escaped=entries.map(function(e){return e.word.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g,'\\function initializeAudio(body,chapterId){');});
+ // A combined regex ensures replacements introduced by another rule are not replaced again.
+ var sorted=entries.slice().sort(function(a,b){return b.word.length-a.word.length;});
+ var pattern=new RegExp(sorted.map(function(e){return e.word.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g,'\\function initializeAudio(body,chapterId){');}).join('|'),'g');
+ var table=new Map(sorted.map(function(e){return [e.word,e.sound];}));
+ return output.replace(pattern,function(m){return table.get(m)||m;});
+}
 function initializeAudio(body,chapterId){
 var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var storageKey='aksaralai.tts.chapter.'+chapterId;
+var pronWord=document.getElementById('pron-word'),pronSound=document.getElementById('pron-sound'),pronAdd=document.getElementById('pron-add'),pronEntriesBox=document.getElementById('pron-entries');
+function showPronunciations(){
+ var entries=pronunciationEntries();pronEntriesBox.innerHTML=entries.length?entries.map(function(e,i){return '<div class="row between" style="margin-top:8px"><span>'+esc(e.word)+' → '+esc(e.sound)+'</span><button type="button" class="btn ghost" data-pron-delete="'+i+'">ลบ</button></div>';}).join(''):'ยังไม่มีคำอ่านที่กำหนด';
+ pronEntriesBox.querySelectorAll('[data-pron-delete]').forEach(function(el){el.onclick=function(){var list=pronunciationEntries();list.splice(Number(el.getAttribute('data-pron-delete')),1);try{localStorage.setItem('aksaralai.tts.pronunciations',JSON.stringify(list));}catch(e){}showPronunciations();};});
+}
+pronAdd.onclick=function(){
+ var word=pronWord.value.trim(),sound=pronSound.value.trim();if(!word||!sound){toast('กรุณากรอกคำและคำอ่าน');return;}
+ if(word.length>80||sound.length>120){toast('คำอ่านยาวเกินไป');return;}
+ var list=pronunciationEntries();var existing=list.findIndex(function(x){return x.word===word;});
+ if(existing>=0)list[existing].sound=sound;else{if(list.length>=100){toast('กำหนดคำอ่านได้สูงสุด 100 คำ');return;}list.push({word:word,sound:sound});}
+ try{localStorage.setItem('aksaralai.tts.pronunciations',JSON.stringify(list));}catch(e){toast('ไม่สามารถบันทึกคำอ่านในเครื่องนี้ได้');return;}
+ pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
+};
+showPronunciations();
 var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-word-v2']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
@@ -75,7 +108,7 @@ function say(t){
  if(!active||paused||t!==ticket)return;
  if(index>=parts.length){active=false;index=0;offset=0;clearCheckpoint();try{var last=JSON.parse(localStorage.getItem('aksaralai.tts.last')||'null');if(last?.chapterId===String(chapterId))localStorage.removeItem('aksaralai.tts.last');}catch(e){}box.querySelectorAll('.active').forEach(function(e){e.classList.remove('active')});status();return;}
  checkpoint();mark();status();
- var spokenFrom=offset,raw=parts[index].slice(spokenFrom),clean=speechText(raw);
+ var spokenFrom=offset,raw=parts[index].slice(spokenFrom),clean=pronunciationText(speechText(raw),pronunciationEntries());
  if(!clean){index++;offset=0;checkpoint();say(t);return;}
  var utterance=new SpeechSynthesisUtterance(clean);utterance.lang='th-TH';utterance.rate=speed;
  // Speech boundary indices refer to the synthesized string, not the original novel.
