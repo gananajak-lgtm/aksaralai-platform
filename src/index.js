@@ -103,8 +103,22 @@ async function api(req,env){
    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:'marin',input:sample,instructions:'Speak natural, intelligible Thai as a calm audiobook narrator. Respect Thai word boundaries and punctuation. Do not translate. No background sounds.',response_format:'mp3'})
   });
   if(!response.ok){
-   console.error('TTS preview provider error',response.status);
-   failure(502,'ระบบสร้างเสียงยังไม่พร้อม กรุณาตรวจสอบเครดิต OpenAI API และตั้งค่าโมเดล');
+   let providerCode='';
+   try{
+    const errorBody=await response.json();
+    const candidate=errorBody?.error?.code;
+    if(typeof candidate==='string')providerCode=candidate.slice(0,80);
+   }catch(_){}
+   // Only expose a fixed diagnostic category, never provider text or secrets.
+   let category='provider_error',detail='OpenAI สร้างเสียงไม่สำเร็จ ตรวจสอบการตั้งค่า API';
+   if(response.status===401){category='invalid_key';detail='OpenAI ไม่ยอมรับ API Key (HTTP 401)';}
+   else if(response.status===403){category='access_denied';detail='บัญชี API ไม่มีสิทธิ์เรียกบริการนี้ (HTTP 403)';}
+   else if(response.status===429&&providerCode==='insufficient_quota'){category='insufficient_quota';detail='เครดิตหรือวงเงิน OpenAI API ไม่เพียงพอ (HTTP 429)';}
+   else if(response.status===429){category='rate_limit';detail='OpenAI จำกัดอัตราการเรียก API ชั่วคราว (HTTP 429)';}
+   else if(response.status===400){category='invalid_request';detail='OpenAI ปฏิเสธพารามิเตอร์โมเดลหรือเสียง (HTTP 400)';}
+   else if(response.status>=500){category='provider_unavailable';detail='บริการ OpenAI ขัดข้องชั่วคราว (HTTP '+response.status+')';}
+   console.error('TTS preview provider error',response.status,category);
+   return reply({detail,error_code:category,provider_status:response.status},502);
   }
   return new Response(response.body,{status:200,headers:{'content-type':'audio/mpeg','cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline; filename="aksaralai-tts-preview.mp3"','x-preview-remaining':String(3-slot.used)}});
  }
