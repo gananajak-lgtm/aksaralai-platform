@@ -17,12 +17,12 @@ function harness(savedLocal,savedSession){
  return {initialize,els,spoken,events,context,engine,flush(){while(timers.length)timers.shift()();}};
 }
 test('checkpoint survives pagehide and reload, resumes second segment, restart clears it',()=>{
- const local=new Map(),session=new Map(),text='เสียงแรก! เสียงที่สอง? เสียงที่สาม!';
+ const local=new Map(),session=new Map(),text='เสียงแรก!\nเสียงที่สอง?\nเสียงที่สาม!';
  const first=harness(local,session);first.initialize(text,42);
  assert.equal(first.els.get('speak').textContent,'▶ เริ่มฟัง');
  first.els.get('speak').onclick();first.flush();
  assert.equal(first.spoken[0].text,'เสียงแรก!');
- first.spoken[0].onend();
+ first.spoken[0].onend();first.flush();
  assert.equal(first.spoken[1].text.trim(),'เสียงที่สอง?');
  assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.42')).index,1);
  first.events.get('pagehide')();first.context.audio.stop();
@@ -47,12 +47,12 @@ test('home exposes last listened chapter link and does not need login',()=>{
 
 test('Android pause and resume starts speaking again without relying on native resume',()=>{
  const local=new Map(),session=new Map();
- const h=harness(local,session);h.initialize('ช่วงที่หนึ่ง! ช่วงที่สอง? ช่วงที่สาม!',77);
+ const h=harness(local,session);h.initialize('ช่วงที่หนึ่ง!\nช่วงที่สอง?\nช่วงที่สาม!',77);
  let cancels=0,resumes=0;
  h.engine.cancel=()=>{cancels++;};
  h.engine.resume=()=>{resumes++;};
  h.els.get('speak').onclick();h.flush();
- h.spoken[0].onend();
+ h.spoken[0].onend();h.flush();
  assert.equal(h.spoken[1].text.trim(),'ช่วงที่สอง?');
  h.els.get('speak').onclick();
  assert.match(h.els.get('speak').textContent,/ฟังต่อ/);
@@ -154,7 +154,7 @@ test('Thai prose is not chopped at 64 characters when the sentence has natural p
  const split=vm.runInNewContext(speechCode+'\nsplitText',h.context);
  const body='เขาก้าวเข้าไปในป่าที่มืดสนิท โดยมีเสียงลมพัดผ่านใบไม้เบา ๆ ก่อนจะหยุดยืนเพื่อฟังเสียงเรียกจากที่ไกลออกไปและหันมามองผู้ร่วมทางด้วยความสงสัย';
  const parts=split(body);
- assert.deepEqual(parts,[body]);
+ assert.equal(parts.length,1);assert.equal(parts[0],body);
 });
 test('paragraph breaks retain a pause before the next spoken chunk, without saying punctuation aloud',()=>{
  const h=harness(new Map(),new Map());
