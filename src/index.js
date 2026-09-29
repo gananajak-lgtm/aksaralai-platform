@@ -7,7 +7,7 @@ const query = (db,sql,...v) => db.prepare(sql).bind(...v).first();
 const rows = async(db,sql,...v) => (await db.prepare(sql).bind(...v).all()).results;
 const run = (db,sql,...v) => db.prepare(sql).bind(...v).run();
 function str(obj,key,min=0,max=1000){if(typeof obj[key]!=='string')failure(400,'ข้อมูล '+key+' ไม่ถูกต้อง');const value=obj[key].trim();if(value.length<min||value.length>max)failure(400,'ความยาว '+key+' ไม่ถูกต้อง');return value;}
-async function payload(req){if(Number(req.headers.get('content-length')||0)>200000)failure(413,'ข้อมูลใหญ่เกินกำหนด');if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'ต้องส่ง JSON');const raw=await req.text();if(enc.encode(raw).length>200000)failure(413,'ข้อมูลใหญ่เกินกำหนด');let value;try{value=JSON.parse(raw);}catch{failure(400,'JSON ไม่ถูกต้อง');}if(!value||Array.isArray(value)||typeof value!=='object')failure(400,'รูปแบบข้อมูลไม่ถูกต้อง');return value;}
+async function payload(req){if(Number(req.headers.get('content-length')||0)>1500000)failure(413,'ข้อมูลใหญ่เกินกำหนด');if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'ต้องส่ง JSON');const raw=await req.text();if(enc.encode(raw).length>1500000)failure(413,'ข้อมูลใหญ่เกินกำหนด');let value;try{value=JSON.parse(raw);}catch{failure(400,'JSON ไม่ถูกต้อง');}if(!value||Array.isArray(value)||typeof value!=='object')failure(400,'รูปแบบข้อมูลไม่ถูกต้อง');return value;}
 const hex=arr=>Array.from(arr,x=>x.toString(16).padStart(2,'0')).join('');
 async function sha(str){return hex(new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(str))));}
 // Workers production caps one PBKDF2 invocation at 100,000 iterations. This MVP hashing
@@ -25,7 +25,7 @@ async function novel(db,nid,user){const n=await query(db,'SELECT * FROM novels W
 async function chapter(db,cid,user){const c=await query(db,'SELECT * FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');const n=await novel(db,c.novel_id,user);if(!c.published&&n.author_id!==user?.id)failure(404,'ไม่พบตอน');return {c,n,owner:n.author_id===user?.id};}
 const integer=s=>{if(!/^[1-9][0-9]*$/.test(s||''))failure(404,'ไม่พบข้อมูล');return Number(s);};
 function novelData(d){return {title:str(d,'title',1,120),summary:str(d,'summary',0,3000),genre:str(d,'genre',0,40)||'ทั่วไป',cover_color:/^#[\da-fA-F]{6}$/.test(d.cover_color||'')?d.cover_color:'#7453a8'};}
-function chapterData(d){return {title:str(d,'title',1,120),body:str(d,'body',1,150000)};}
+function chapterData(d){return {title:str(d,'title',1,120),body:str(d,'body',1,300000)};}
 function visibility(d){if(typeof d.published!=='boolean')failure(400,'สถานะเผยแพร่ไม่ถูกต้อง');return d.published?1:0;}
 async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
