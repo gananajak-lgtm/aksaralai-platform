@@ -51,14 +51,15 @@ function pronunciationEntries(){
  try{var v=JSON.parse(localStorage.getItem('aksaralai.tts.pronunciations')||'[]');return Array.isArray(v)?v.filter(function(x){return x&&typeof x.word==='string'&&typeof x.sound==='string'&&x.word&&x.sound;}).slice(0,100):[];}catch(e){return [];}
 }
 function pronunciationText(text,entries){
- var output=text;
- // Longer words first, so a short nickname does not replace part of a full name first.
- entries.slice().sort(function(a,b){return b.word.length-a.word.length;}).forEach(function(e){
-  if(!e.word||!e.sound)return;
-  // Do not repeatedly replace earlier substitutions: replacements are single-pass tokens.
- });
- if(!entries.length)return output;
- var escaped=entries.map(function(e){return e.word.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g,'\\function initializeAudio(body,chapterId){');});
+ if(!entries.length)return text;
+ var ordered=entries.slice().sort(function(a,b){return b.word.length-a.word.length;}),out='';
+ for(var i=0;i<text.length;){
+  var match=ordered.find(function(entry){return text.startsWith(entry.word,i);});
+  if(match){out+=match.sound;i+=match.word.length;}else{out+=text[i];i++;}
+ }
+ return out;
+}
+function initializeAudio(body,chapterId){');});
  // A combined regex ensures replacements introduced by another rule are not replaced again.
  var sorted=entries.slice().sort(function(a,b){return b.word.length-a.word.length;});
  var pattern=new RegExp(sorted.map(function(e){return e.word.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g,'\\function initializeAudio(body,chapterId){');}).join('|'),'g');
