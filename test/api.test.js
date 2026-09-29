@@ -75,3 +75,21 @@ test('refuses chapter over 300k characters',async()=>{
  const chapter=await h.api('/writer/novels/'+novel.id+'/chapters','POST',{title:'เกินกำหนด',body:'ก'.repeat(300001)});
  assert.equal(chapter.status,400);
 });
+
+test('anonymous visitors can browse the catalog but cannot fetch chapter content or comments',async()=>{
+ const h=harness();
+ assert.equal((await h.api('/register','POST',{username:'gatedwriter',display_name:'ผู้เขียน',password:'long-password-01',role:'writer'})).status,201);
+ const n=await h.api('/writer/novels','POST',{title:'เรื่องสำหรับสมาชิก',summary:'คำโปรย',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนแรก',body:'เนื้อหาที่ต้องเข้าสู่ระบบ'});
+ assert.equal((await h.api('/writer/chapters/'+c.id+'/publish','POST',{published:true})).status,200);
+ assert.equal((await h.api('/writer/novels/'+n.id+'/publish','POST',{published:true})).status,200);
+ h.clear();
+ assert.equal((await h.api('/novels')).novels.length,1);
+ assert.equal((await h.api('/novels/'+n.id)).novel.title,'เรื่องสำหรับสมาชิก');
+ const chapter=await h.api('/chapters/'+c.id);
+ assert.equal(chapter.status,401);
+ assert.equal(chapter.chapter,undefined);
+ assert.equal((await h.api('/chapters/'+c.id+'/comments')).status,401);
+ assert.equal((await h.api('/register','POST',{username:'gatedreader',display_name:'ผู้อ่าน',password:'long-password-02',role:'reader'})).status,201);
+ assert.equal((await h.api('/chapters/'+c.id)).chapter.body,'เนื้อหาที่ต้องเข้าสู่ระบบ');
+});
