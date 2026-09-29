@@ -7,14 +7,15 @@ import worker from '../src/index.js';
 function database(){
  const sqlite=new DatabaseSync(':memory:');
  sqlite.exec(fs.readFileSync(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8'));
+ sqlite.exec(fs.readFileSync(new URL('../migrations/0002_tts_preview.sql',import.meta.url),'utf8'));
  return {prepare(sql){let args=[];const p=sqlite.prepare(sql);return {bind(...v){args=v;return this},async first(){return p.get(...args)||null},async all(){return {results:p.all(...args)}},async run(){const r=p.run(...args);return {meta:{last_row_id:Number(r.lastInsertRowid),changes:Number(r.changes)}}}}}};
 }
-function harness(){
- const env={DB:database(),ASSETS:{fetch:async()=>new Response('asset')}};let cookie='';
+function harness(extraEnv={}){
+ const env={DB:database(),ASSETS:{fetch:async()=>new Response('asset')},...extraEnv};let cookie='';
  return {async api(path,method='GET',data,headers={}){
   const req=new Request('https://example.com/api'+path,{method,headers:{...(method==='GET'?{}:{'content-type':'application/json','origin':'https://example.com'}),...(cookie?{cookie}:{}),...headers},body:data===undefined?undefined:JSON.stringify(data)});
   const res=await worker.fetch(req,env);if(res.headers.get('set-cookie'))cookie=res.headers.get('set-cookie').split(';')[0];return {status:res.status,...await res.json()};
- },getCookie(){return cookie;},setCookie(s){cookie=s;},clear(){cookie='';}};
+ },env,getCookie(){return cookie;},setCookie(s){cookie=s;},clear(){cookie='';}};
 }
 test('writer publishes, reader saves reads comments and cannot edit',async()=>{
  const h=harness();
@@ -92,4 +93,42 @@ test('anonymous visitors can browse the catalog but cannot fetch chapter content
  assert.equal((await h.api('/chapters/'+c.id+'/comments')).status,401);
  assert.equal((await h.api('/register','POST',{username:'gatedreader',display_name:'ผู้อ่าน',password:'long-password-02',role:'reader'})).status,201);
  assert.equal((await h.api('/chapters/'+c.id)).chapter.body,'เนื้อหาที่ต้องเข้าสู่ระบบ');
+});
+
+test('OpenAI preview is disabled by default and reserved for configured owner with three daily attempts',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'adminwriter'});
+ const admin={username:'adminwriter',display_name:'ผู้ดูแล',password:'long-password-01',role:'writer'};
+ assert.equal((await h.api('/register','POST',admin)).status,201);
+ const n=await h.api('/writer/novels','POST',{title:'เรื่อง',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอน',body:'ข้อความทดสอบ'});
+ const ownerCookie=h.getCookie();
+ assert.equal((await h.api('/writer/tts-preview/status')).remaining,3);
+ h.clear();
+ assert.equal((await h.api('/register','POST',{username:'otherwriter',display_name:'ผู้อื่น',password:'long-password-02',role:'writer'})).status,201);
+ assert.equal((await h.api('/writer/tts-preview/status')).enabled,false);
+ assert.equal((await h.api('/writer/chapters/'+c.id+'/tts/preview','POST',{})).status,403);
+ h.setCookie(ownerCookie);
+ const nativeFetch=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async(url,options)=>{
+  calls++;
+  assert.equal(url,'https://api.openai.com/v1/audio/speech');
+  assert.equal(options.headers.authorization,'Bearer fake-test-key');
+  const body=JSON.parse(options.body);
+  assert.equal(body.model,'gpt-4o-mini-tts');
+  assert.ok(body.input.length<500);
+  return new Response(new Uint8Array(256),{status:200,headers:{'content-type':'audio/mpeg'}});
+ };
+ try{
+  for(let i=0;i<3;i++){
+   // API harness normally parses JSON, so fetch raw audio for this endpoint.
+   const request=new Request('https://example.com/api/writer/chapters/'+c.id+'/tts/preview',{method:'POST',headers:{cookie:ownerCookie,origin:'https://example.com'}});
+   const response=await worker.fetch(request,h.env);
+   assert.equal(response.status,200);
+   assert.equal(response.headers.get('content-type'),'audio/mpeg');
+  }
+  assert.equal((await h.api('/writer/chapters/'+c.id+'/tts/preview','POST',{})).status,429);
+  assert.equal(calls,3);
+  assert.equal((await h.api('/writer/tts-preview/status')).remaining,0);
+ }finally{globalThis.fetch=nativeFetch;}
 });
