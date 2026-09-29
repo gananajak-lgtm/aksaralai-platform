@@ -76,6 +76,39 @@ async function api(req,env){
   return reply({chapter:c,novel:{id:n.id,title:n.title},chapters});
  }
 
+ // Preview only: fail closed unless a specific existing writer is explicitly configured.
+ // OpenAI is called server-side only; the API key never reaches the browser.
+ if(m==='GET'&&p==='/api/writer/tts-preview/status'){
+  const user=await author(db,req);
+  const enabled=Boolean(env.OPENAI_API_KEY&&env.OPENAI_TTS_ADMIN_USERNAME&&user.username===env.OPENAI_TTS_ADMIN_USERNAME);
+  if(!enabled)return reply({enabled:false});
+  const day=new Date().toISOString().slice(0,10);
+  const usage=await query(db,'SELECT used FROM tts_preview_usage WHERE day_utc=? AND username=?',day,user.username);
+  return reply({enabled:true,remaining:Math.max(0,3-(usage?.used||0)),daily_limit:3});
+ }
+ if(m==='POST'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)\/tts\/preview$/))){
+  const user=await author(db,req),cid=integer(x[1]);
+  if(!env.OPENAI_API_KEY||!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'ทดลองเสียงได้เฉพาะบัญชีผู้ดูแลที่ตั้งค่าไว้');
+  const c=await query(db,'SELECT novel_id FROM chapters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตอน');
+  await own(db,c.novel_id,user);
+  const day=new Date().toISOString().slice(0,10);
+  const slot=await query(db,'INSERT INTO tts_preview_usage(day_utc,username,used) VALUES(?,?,1) ON CONFLICT(day_utc,username) DO UPDATE SET used=used+1 WHERE used<3 RETURNING used',day,user.username);
+  if(!slot)failure(429,'ทดลองเสียงครบ 3 ครั้งของวันนี้แล้ว (ตามเวลา UTC)');
+  // Fixed short sample: no user-controlled input or bulk generation in this costly endpoint.
+  const sample='สวัสดีค่ะ ยินดีต้อนรับสู่อักษราลัย คืนนี้สายลมพัดผ่านยอดไม้ พรานสิงห์หยุดฟังเสียงจากความมืด ก่อนจะค่อย ๆ ก้าวเดินต่อไป';
+  const response=await fetch('https://api.openai.com/v1/audio/speech',{
+   method:'POST',
+   headers:{'authorization':'Bearer '+env.OPENAI_API_KEY,'content-type':'application/json'},
+   body:JSON.stringify({model:'gpt-4o-mini-tts',voice:'marin',input:sample,instructions:'Speak natural, intelligible Thai as a calm audiobook narrator. Respect Thai word boundaries and punctuation. Do not translate. No background sounds.',response_format:'mp3'})
+  });
+  if(!response.ok){
+   console.error('TTS preview provider error',response.status);
+   failure(502,'ระบบสร้างเสียงยังไม่พร้อม กรุณาตรวจสอบเครดิต OpenAI API และตั้งค่าโมเดล');
+  }
+  return new Response(response.body,{status:200,headers:{'content-type':'audio/mpeg','cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline; filename="aksaralai-tts-preview.mp3"','x-preview-remaining':String(3-slot.used)}});
+ }
+
  // Each MP3 is private in R2. Chapter access uses the same membership rules as text.
  if((m==='GET')&&(x=p.match(/^\/api\/chapters\/(\d+)\/audio\/status$/))){
   const user=await identity(db,req,true);
