@@ -143,3 +143,20 @@ test('OpenAI preview is disabled by default and reserved for configured owner wi
   assert.equal((await h.api('/writer/tts-preview/status')).remaining,0);
  }finally{globalThis.fetch=nativeFetch;}
 });
+
+test('OpenAI preview returns safe actionable diagnostics without leaking provider response',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-key',OPENAI_TTS_ADMIN_USERNAME:'adminuser'});
+ assert.equal((await h.api('/register','POST',{username:'adminuser',display_name:'Admin',password:'long-password-05',role:'writer'})).status,201);
+ const n=await h.api('/writer/novels','POST',{title:'เรื่องทดสอบ',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนทดสอบ',body:'สวัสดี'});
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:{code:'insufficient_quota',message:'secret should not be shown'}}),{status:429,headers:{'content-type':'application/json'}});
+ try{
+  const response=await h.api('/writer/chapters/'+c.id+'/tts/preview','POST',{});
+  assert.equal(response.status,502);
+  assert.equal(response.error_code,'insufficient_quota');
+  assert.equal(response.provider_status,429);
+  assert.equal(JSON.stringify(response).includes('secret should not be shown'),false);
+  assert.equal((await h.api('/writer/tts-preview/status')).remaining,2);
+ }finally{globalThis.fetch=original;}
+});
