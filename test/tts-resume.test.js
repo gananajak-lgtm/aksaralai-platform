@@ -44,3 +44,28 @@ test('home exposes last listened chapter link and does not need login',()=>{
  assert.ok(html.includes('🎧 กลับไปฟังตอนล่าสุด'));
  assert.ok(html.includes('aksaralai.tts.last'));
 });
+
+test('Android pause and resume starts speaking again without relying on native resume',()=>{
+ const local=new Map(),session=new Map();
+ const h=harness(local,session);h.initialize('ช่วงที่หนึ่ง! ช่วงที่สอง? ช่วงที่สาม!',77);
+ let cancels=0,resumes=0;
+ h.engine.cancel=()=>{cancels++;};
+ h.engine.resume=()=>{resumes++;};
+ h.els.get('speak').onclick();
+ h.spoken[0].onend();
+ assert.equal(h.spoken[1].text.trim(),'ช่วงที่สอง?');
+ h.els.get('speak').onclick();
+ assert.match(h.els.get('speak').textContent,/ฟังต่อ/);
+ assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.77')).index,1);
+ const before=h.spoken.length;
+ h.els.get('speak').onclick();
+ assert.equal(h.spoken.length,before+1,'resume must start a new utterance');
+ assert.equal(h.spoken.at(-1).text.trim(),'ช่วงที่สอง?');
+ assert.equal(resumes,0,'native resume must not be required');
+ assert.ok(cancels>=2);
+ // A canceled utterance completing late must not skip any text.
+ h.spoken[1].onend();
+ assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.77')).index,1);
+ h.spoken.at(-1).onend();
+ assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.77')).index,2);
+});
