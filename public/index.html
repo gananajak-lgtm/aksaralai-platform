@@ -28,14 +28,14 @@ async function shelf(){if(!user){app.innerHTML='<div class="empty">กรุณ�
 async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerHTML='<div class="panel" style="margin-top:25px"><div class="row"><div class="cover" style="min-width:170px;height:190px;--cover:'+esc(n.cover_color)+'">📖</div><div style="flex:1"><span class="chip">'+esc(n.genre)+'</span><h1>'+esc(n.title)+'</h1><p>เขียนโดย '+esc(o.author)+'</p><p>'+esc(n.summary)+'</p><div class="controls"><button class="btn" id="begin">เริ่มอ่าน</button><button class="btn subtle" id="save">'+(o.saved?'✓ อยู่ในชั้นหนังสือ':'＋ เพิ่มเข้าชั้นหนังสือ')+'</button>'+(o.is_owner?'<button class="btn ghost" data-go="edit" data-id="'+n.id+'">จัดการเรื่อง</button>':'')+'</div></div></div><h2>สารบัญ · '+o.chapters.length+' ตอน</h2><div class="chapter-list">'+(o.chapters.length?o.chapters.map(function(c){return '<div class="chapter-item"><span>'+esc(c.position)+'. '+esc(c.title)+(c.published?'':' · ฉบับร่าง')+'</span><button class="btn subtle" data-go="read" data-id="'+c.id+'">อ่าน</button></div>'}).join(''):'<p class="empty">ยังไม่มีตอนให้อ่าน</p>')+'</div></div>';document.getElementById('begin').onclick=function(){if(o.chapters.length)go('read',o.progress?.chapter_id||o.chapters[0].id);else toast('ยังไม่มีตอนให้อ่าน');};document.getElementById('save').onclick=async function(){if(!user){go('auth');return;}var r=await call(function(){return api('/novels/'+id+'/shelf','POST',{})});if(r)go('novel',id);};}
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
 function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
-function splitText(s){var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],a=[];pieces.forEach(function(p){if(!p.trim()){if(a.length)a[a.length-1]+=p;return;}while(p.length>180){a.push(p.slice(0,180));p=p.slice(180);}if(p)a.push(p);});return a;}
+function splitText(s){var pieces=s.match(/[^\n。！？!?]+[。！？!?]*|\n+/g)||[],a=[];pieces.forEach(function(p){if(!p.trim()){if(a.length)a[a.length-1]+=p;return;}while(p.length>64){var end=p.lastIndexOf(' ',64);if(end<20)end=64;a.push(p.slice(0,end));p=p.slice(end);}if(p)a.push(p);});return a;}
 function initializeAudio(body,chapterId){
-var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,active=false,paused=false,ticket=0;
+var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var storageKey='aksaralai.tts.chapter.'+chapterId;
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80)]);
-function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');return v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length?v.index:0;}catch(e){return 0;}}
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),64]);
+function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
- var value=JSON.stringify({signature:signature,index:index,chapterId:String(chapterId),at:Date.now()});
+ var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
  try{localStorage.setItem(storageKey,value);localStorage.setItem('aksaralai.tts.last',JSON.stringify({chapterId:String(chapterId),at:Date.now()}));}catch(e){}
  try{sessionStorage.setItem(storageKey,value);}catch(e){}
 }
@@ -56,11 +56,12 @@ function status(){
 function mark(){box.querySelectorAll('.active').forEach(function(e){e.classList.remove('active')});var n=box.querySelector('[data-segment="'+index+'"]');if(n)n.classList.add('active');}
 function say(t){
  if(!active||paused||t!==ticket)return;
- if(index>=parts.length){active=false;index=0;clearCheckpoint();try{var last=JSON.parse(localStorage.getItem('aksaralai.tts.last')||'null');if(last?.chapterId===String(chapterId))localStorage.removeItem('aksaralai.tts.last');}catch(e){}box.querySelectorAll('.active').forEach(function(e){e.classList.remove('active')});status();return;}
+ if(index>=parts.length){active=false;index=0;offset=0;clearCheckpoint();try{var last=JSON.parse(localStorage.getItem('aksaralai.tts.last')||'null');if(last?.chapterId===String(chapterId))localStorage.removeItem('aksaralai.tts.last');}catch(e){}box.querySelectorAll('.active').forEach(function(e){e.classList.remove('active')});status();return;}
  checkpoint();mark();status();
- var utterance=new SpeechSynthesisUtterance(parts[index]);utterance.lang='th-TH';utterance.rate=speed;
+ var spokenFrom=offset;var utterance=new SpeechSynthesisUtterance(parts[index].slice(spokenFrom));utterance.lang='th-TH';utterance.rate=speed;
+ utterance.onboundary=function(e){if(t!==ticket||!active||paused)return;if(Number.isInteger(e.charIndex)&&e.charIndex>0){offset=Math.min(parts[index].length-1,spokenFrom+e.charIndex);checkpoint();}};
  var selected=voices().find(function(v){return v.voiceURI===voice.value});if(selected)utterance.voice=selected;
- utterance.onend=function(){if(t!==ticket||!active)return;index++;checkpoint();say(t);};
+ utterance.onend=function(){if(t!==ticket||!active)return;index++;offset=0;checkpoint();say(t);};
  utterance.onerror=function(e){if(t!==ticket||!active||e.error==='interrupted'||e.error==='canceled')return;active=false;checkpoint();status();toast('ไม่สามารถอ่านด้วยเสียงนี้ได้');};
  engine.speak(utterance);
 }
@@ -75,7 +76,7 @@ button.onclick=function(){
  else{paused=true;ticket++;checkpoint();engine.cancel();status();}
 };
 document.getElementById('stop').onclick=function(){checkpoint();ticket++;engine.cancel();active=false;paused=false;status();};
-restartButton.onclick=function(){index=0;clearCheckpoint();playFromCheckpoint();};
+restartButton.onclick=function(){index=0;offset=0;clearCheckpoint();playFromCheckpoint();};
 rate.onchange=function(){speed=Number(rate.value);localStorage.setItem('aksaralai.speed',String(speed));if(active)playFromCheckpoint();};
 voice.onchange=function(){if(active)playFromCheckpoint();};
 window.addEventListener('pagehide',saveBeforeExit);
