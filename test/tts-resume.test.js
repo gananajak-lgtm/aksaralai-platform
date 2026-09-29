@@ -125,3 +125,26 @@ test('punctuation and quotes are silent while visual novel remains unchanged',()
  assert.ok(!h.spoken[0].onboundary,'normalized text must not store incorrect raw offsets');
  assert.equal(h.els.get('reading').innerHTML.includes('“เสียงลึกลับ…”'),true);
 });
+
+test('pronunciation glossary is local-only and affects speech, not displayed novel',()=>{
+ const local=new Map(),session=new Map();
+ const h=harness(local,session),body='พรานสิงห์เดินเข้าป่า!';
+ h.initialize(body,55);
+ h.els.get('pron-word').value='พรานสิงห์';
+ h.els.get('pron-sound').value='พฺราน สิง';
+ h.els.get('pron-add').onclick();
+ assert.deepEqual(JSON.parse(local.get('aksaralai.tts.pronunciations')),[{word:'พรานสิงห์',sound:'พฺราน สิง'}]);
+ h.els.get('speak').onclick();h.flush();
+ assert.ok(h.spoken[0].text.startsWith('พฺราน สิง'));
+ assert.ok(h.els.get('reading').innerHTML.includes('พรานสิงห์'));
+});
+test('longest pronunciation rule takes precedence without cascading substitutions',()=>{
+ const h=harness(new Map(),new Map());
+ const transform=vm.runInNewContext(speechCode+'\npronunciationText',h.context);
+ const text=transform('ชาวอินทราวดีพบอิน',[
+ {word:'อิน',sound:'อะ'},
+ {word:'อินทราวดี',sound:'อิน-ทฺรา-วะ-ดี'},
+ {word:'อะ',sound:'ไม่ควรแทนซ้ำ'}
+ ]);
+ assert.equal(text,'ชาวอิน-ทฺรา-วะ-ดีพบอะ');
+});
