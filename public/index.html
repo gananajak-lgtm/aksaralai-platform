@@ -74,6 +74,7 @@
 }
 .ai-format-area{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.ai-format-area .small{margin:6px 0 0}.ai-format-dialog{width:min(94vw,850px);max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);padding:clamp(14px,3vw,25px)}.ai-format-dialog::backdrop{background:#191021a8}.ai-format-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ai-format-compare textarea{width:100%;min-height:220px;max-height:42dvh;white-space:pre-wrap;font-size:14px;line-height:1.6}.ai-format-dialog h2{font-size:19px;margin-top:0}@media(max-width:640px){.ai-format-compare{grid-template-columns:minmax(0,1fr)}.ai-format-compare textarea{min-height:135px;max-height:27dvh}}
 .ai-admin-dialog{border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);width:min(94vw,700px);max-height:90dvh;overflow:auto;padding:0}.ai-admin-dialog::backdrop{background:#261d32af}.ai-admin-inner{padding:clamp(16px,4vw,28px)}.ai-admin-inner h2{margin:0;font-size:22px}.ai-admin-inner textarea{min-height:120px}.ai-admin-inner .panel{margin-top:14px}.ai-admin-inner .controls{gap:8px}.ai-admin-inner .btn{max-width:100%}.manuscript-export-dialog{width:min(92vw,470px);border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);padding:24px}.manuscript-export-dialog::backdrop{background:#261d32a6}.manuscript-export-dialog h2{margin:0 0 10px}.export-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:20px 0}.export-actions .btn{min-height:46px;text-align:center}
+.chapter-edit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:9px 0}.chapter-edit-actions .btn{font-size:14px;min-height:39px;padding:9px 12px}.chapter-edit-actions [id="chapter-clear-all"]{color:#a5263f}@media(max-width:640px){.chapter-edit-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-edit-actions .btn{width:100%;min-width:0;white-space:normal;padding:10px 8px;font-size:13px}}
 </style></head>
 <body><header class="top"><div class="shell nav"><div class="brand">✦ <i>อักษราลัย</i></div><button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="mobile-navlinks">☰ เมนู</button><div class="navlinks" id="mobile-navlinks"><button data-go="home">สำรวจนิยาย</button><button data-go="shelf">ชั้นหนังสือ</button><button data-go="studio" id="writer-nav" hidden>สตูดิโอนักเขียน</button><button type="button" id="voice-studio-open" hidden>🎙️ ใช้ OpenAI</button><button type="button" id="ai-admin-open" hidden>🤖 AI แอดมิน</button></div><div class="right"><button id="install" hidden>⬇ ติดตั้ง</button><span class="small" id="account"></span><button data-go="auth" id="authnav">เข้าสู่ระบบ</button></div></div></header>
 <main class="shell layout" id="app" aria-live="polite"></main><footer class="footer">อักษราลัย • แพลตฟอร์มอ่าน เขียน และฟังนิยาย · เวอร์ชันทดลอง</footer><div class="toast hide" id="toast" role="status"></div><dialog class="voice-studio-dialog" id="voice-studio-modal" aria-labelledby="voice-studio-title">
@@ -578,13 +579,16 @@ async function editNovel(id){if(!user||user.role!=='writer')return go('auth');va
 async function editChapter(id){var o=await api('/chapters/'+id),c=o.chapter;chapterForm(c.novel_id,c);}
 function chapterForm(nid,chapter){
 var id=chapter?.id;
-app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><section class="ai-format-area" id="ai-format-section" hidden><button type="button" class="btn subtle" id="ai-format-button">✨ OpenAI ช่วยจัดย่อหน้า</button><p class="small" id="ai-format-message" role="status">ใช้เฉพาะข้อความช่วงที่กำลังแก้ หรือเลือกข้อความไม่เกิน 4,500 ตัวอักษร · ใช้เครดิต API จริง · ไม่แก้ต้นฉบับโดยอัตโนมัติ</p></section><dialog class="ai-format-dialog" id="ai-format-preview"><h2>✨ ตรวจทานก่อนใช้การจัดย่อหน้า</h2><p class="small" id="ai-format-breaks"></p><div class="ai-format-compare"><div><label for="ai-format-before">ข้อความเดิม</label><textarea id="ai-format-before" readonly></textarea></div><div><label for="ai-format-after">ข้อความที่ AI เสนอ</label><textarea id="ai-format-after" readonly></textarea></div></div><p class="small">ระบบยืนยันแล้วว่า AI ไม่แก้หรือลบอักขระเดิม แต่คุณควรตรวจการแบ่งย่อหน้าก่อนยอมรับ</p><div class="controls"><button type="button" class="btn" id="ai-format-accept">ใช้การจัดย่อหน้านี้</button><button type="button" class="btn ghost" id="ai-format-cancel">ยกเลิก</button></div></dialog><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📤 ส่งออกต้นฉบับตอนนี้</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px" hidden><h2>🎙️ AI Voice Studio (ฟรีบนคอมพิวเตอร์)</h2><p class="small">เปิดโปรแกรม AI Voice Studio ที่ติดตั้งบนเครื่องของคุณเพื่อสร้างเสียงด้วย VachanaTTS โดยไม่ใช้เครดิต OpenAI</p><p><a class="btn" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">เปิด AI Voice Studio ฟรี ↗</a></p><p class="small">ต้องติดตั้งและเปิดโปรแกรม AI Voice Studio บนคอมพิวเตอร์เครื่องที่กดปุ่มก่อน · บนมือถือหรือคอมพิวเตอร์ที่ไม่มีโปรแกรมนี้ ลิงก์จะยังใช้งานไม่ได้ · ไฟล์ MP3 ที่สร้างเสร็จสามารถอัปโหลดด้วยปุ่มด้านบน</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
+app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-edit-actions" id="chapter-edit-actions"><button type="button" class="btn subtle" id="chapter-edit-all">📝 แก้ไขทั้งตอน</button><button type="button" class="btn subtle" id="chapter-edit-chunks" hidden>🧩 กลับไปแก้ทีละช่วง</button><button type="button" class="btn subtle" id="chapter-replace-all">📋 วางต้นฉบับใหม่ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-clear-all">🗑️ ล้างเนื้อหาทั้งตอน</button><input type="file" accept=".txt,text/plain" id="chapter-import-txt" hidden><button type="button" class="btn ghost" id="chapter-import-button">📂 นำเข้าไฟล์ .txt ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-undo-whole" hidden>↩ คืนค่าก่อนเปลี่ยนทั้งตอน</button></div><p class="small" id="chapter-edit-mode-note">โหมดแก้ไขทีละช่วงช่วยให้มือถือทำงานลื่น · ปุ่มแก้ไขทั้งตอนใช้เลือกทั้งหมดและวางทับได้</p><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><section class="ai-format-area" id="ai-format-section" hidden><button type="button" class="btn subtle" id="ai-format-button">✨ OpenAI ช่วยจัดย่อหน้า</button><p class="small" id="ai-format-message" role="status">ใช้เฉพาะข้อความช่วงที่กำลังแก้ หรือเลือกข้อความไม่เกิน 4,500 ตัวอักษร · ใช้เครดิต API จริง · ไม่แก้ต้นฉบับโดยอัตโนมัติ</p></section><dialog class="ai-format-dialog" id="ai-format-preview"><h2>✨ ตรวจทานก่อนใช้การจัดย่อหน้า</h2><p class="small" id="ai-format-breaks"></p><div class="ai-format-compare"><div><label for="ai-format-before">ข้อความเดิม</label><textarea id="ai-format-before" readonly></textarea></div><div><label for="ai-format-after">ข้อความที่ AI เสนอ</label><textarea id="ai-format-after" readonly></textarea></div></div><p class="small">ระบบยืนยันแล้วว่า AI ไม่แก้หรือลบอักขระเดิม แต่คุณควรตรวจการแบ่งย่อหน้าก่อนยอมรับ</p><div class="controls"><button type="button" class="btn" id="ai-format-accept">ใช้การจัดย่อหน้านี้</button><button type="button" class="btn ghost" id="ai-format-cancel">ยกเลิก</button></div></dialog><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📤 ส่งออกต้นฉบับตอนนี้</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px" hidden><h2>🎙️ AI Voice Studio (ฟรีบนคอมพิวเตอร์)</h2><p class="small">เปิดโปรแกรม AI Voice Studio ที่ติดตั้งบนเครื่องของคุณเพื่อสร้างเสียงด้วย VachanaTTS โดยไม่ใช้เครดิต OpenAI</p><p><a class="btn" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">เปิด AI Voice Studio ฟรี ↗</a></p><p class="small">ต้องติดตั้งและเปิดโปรแกรม AI Voice Studio บนคอมพิวเตอร์เครื่องที่กดปุ่มก่อน · บนมือถือหรือคอมพิวเตอร์ที่ไม่มีโปรแกรมนี้ ลิงก์จะยังใช้งานไม่ได้ · ไฟล์ MP3 ที่สร้างเสร็จสามารถอัปโหลดด้วยปุ่มด้านบน</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
 var chapterEditor=document.querySelector('#chapterform textarea[name="body"]'),chapterCounter=document.getElementById('chapter-counter');
 var chapterTitle=document.querySelector('#chapterform input[name="title"]');
 var startingBody=chapter?.body||'',chapterSegments=null,activeSegment=0,chapterLength=startingBody.length;
 var chunkToolbar=document.getElementById('chapter-chunk-toolbar'),chunkPosition=document.getElementById('chapter-chunk-position');
 var backupKey='aksaralai.chapter.draft.'+(user?.id||'unknown')+'.'+(id||'new-'+nid);
-var backupTimer=null,chapterDirty=false;
+var backupTimer=null,chapterDirty=false,wholeEditMode=false,previousWholeReplacement=null;
+var allEditButton=document.getElementById('chapter-edit-all'),chunksEditButton=document.getElementById('chapter-edit-chunks');
+var replaceAllButton=document.getElementById('chapter-replace-all'),clearAllButton=document.getElementById('chapter-clear-all'),undoWholeButton=document.getElementById('chapter-undo-whole');
+var editModeNote=document.getElementById('chapter-edit-mode-note');
 function splitChapterText(text){
  var segments=[],cursor=0,max=4500;
  while(cursor<text.length){
@@ -616,7 +620,7 @@ function updateChapterCount(){
 }
 function setChapterText(text){
  chapterLength=text.length;
- if(window.matchMedia('(max-width:640px)').matches&&text.length>12000){
+ if(!wholeEditMode&&window.matchMedia('(max-width:640px)').matches&&text.length>12000){
   chapterSegments=splitChapterText(text);activeSegment=0;
   chunkToolbar.hidden=false;chapterEditor.required=false;
   chapterEditor.maxLength=15000;
@@ -625,6 +629,9 @@ function setChapterText(text){
   chapterSegments=null;chunkToolbar.hidden=true;chapterEditor.required=true;
   chapterEditor.maxLength=300000;chapterEditor.value=text;
  }
+ allEditButton.hidden=wholeEditMode;
+ chunksEditButton.hidden=!wholeEditMode;
+ editModeNote.textContent=wholeEditMode?'โหมดแก้ไขทั้งตอน: เลือกทั้งหมด ลบ หรือวางทับได้ · ถ้าพิมพ์แล้วมือถือหน่วง ให้กลับไปแก้ทีละช่วง':'โหมดแก้ไขทีละช่วง: ระบบรวมทุกช่วงเป็นตอนเดียวเมื่อกดบันทึก';
  updateChapterCount();
 }
 function saveBackup(){
@@ -674,6 +681,71 @@ chapterEditor.addEventListener('input',function(){
  updateChapterCount();scheduleBackup();
 });
 chapterTitle.addEventListener('input',scheduleBackup);
+// Full-chapter edits retain the existing segmented data until explicitly replaced.
+// Switching modes never saves or changes the server's manuscript.
+allEditButton.onclick=function(){
+ var full=joinChapterText();
+ wholeEditMode=true;
+ setChapterText(full);
+ chapterEditor.focus();
+};
+chunksEditButton.onclick=function(){
+ var full=joinChapterText();
+ wholeEditMode=false;
+ setChapterText(full);
+ chapterEditor.focus();
+};
+function replaceWholeChapter(nextText,operation){
+ if(typeof nextText!=='string'||nextText.length>300000){
+  toast('ต้นฉบับต้องไม่เกิน 300,000 ตัวอักษร');return false;
+ }
+ var old=joinChapterText();
+ if(nextText===old){toast('เนื้อหายังเหมือนเดิม');return false;}
+ if(!confirm(operation+'? ระบบจะยังไม่บันทึกจนกว่าคุณจะกดปุ่มบันทึกฉบับร่าง'))return false;
+ // Restore immediately without relying on localStorage capacity.
+ previousWholeReplacement=old;
+ undoWholeButton.hidden=false;
+ setChapterText(nextText);
+ scheduleBackup();
+ // Important: save the new full chapter checkpoint right away for reload safety.
+ clearTimeout(backupTimer);saveBackup();
+ chapterEditor.focus();
+ toast('เปลี่ยนเฉพาะในช่องแก้ไขแล้ว กรุณาตรวจและกดบันทึกฉบับร่าง');
+ return true;
+}
+replaceAllButton.onclick=function(){
+ var text=prompt('วางต้นฉบับใหม่ทั้งตอน (สูงสุด 300,000 ตัวอักษร)\nกดตกลงเพื่อดูคำยืนยันอีกครั้ง ก่อนแทนที่ข้อความเดิม');
+ if(text===null)return;
+ if(!text.trim()){toast('ต้นฉบับใหม่ต้องมีข้อความ กรุณาใช้ปุ่มล้างเนื้อหาทั้งตอนถ้าต้องการลบทั้งหมด');return;}
+ replaceWholeChapter(text,'ยืนยันแทนที่เนื้อหาทั้งตอนด้วยข้อความที่วาง');
+};
+clearAllButton.onclick=function(){
+ replaceWholeChapter('','ยืนยันล้างเนื้อหาทุกช่วงของตอนนี้');
+};
+undoWholeButton.onclick=function(){
+ if(previousWholeReplacement===null)return;
+ var original=previousWholeReplacement;
+ previousWholeReplacement=null;
+ undoWholeButton.hidden=true;
+ setChapterText(original);
+ scheduleBackup();
+ clearTimeout(backupTimer);saveBackup();
+ toast('คืนค่าเนื้อหาก่อนเปลี่ยนทั้งตอนแล้ว · ต้องกดบันทึกหากต้องการเก็บค่านี้');
+};
+var importButton=document.getElementById('chapter-import-button'),importInput=document.getElementById('chapter-import-txt');
+importButton.onclick=function(){importInput.value='';importInput.click();};
+importInput.onchange=async function(){
+ var file=importInput.files&&importInput.files[0];
+ if(!file)return;
+ if(file.size>1200000){toast('ไฟล์ใหญ่เกินไป กรุณาใช้ .txt ขนาดไม่เกิน 1.2 MB');return;}
+ if(!/\\.txt$/i.test(file.name)){toast('กรุณาเลือกไฟล์ .txt เท่านั้น');return;}
+ try{
+  var incoming=await file.text();
+  if(incoming.charCodeAt(0)===0xFEFF)incoming=incoming.slice(1);
+  if(!incoming.trim()){toast('ไฟล์ .txt ไม่มีข้อความ');return;}
+  replaceWholeChapter(incoming,'ยืนยันนำเข้าไฟล์ '+file.name+' แทนที่เนื้อหาทั้งตอน');
+ }catch(e){toast('อ่านไฟล์ .txt ไม่สำเร็จ');}
+};
 setChapterText(startingBody);
 try{
  var oldBackup=JSON.parse(localStorage.getItem(backupKey)||'null');
@@ -763,7 +835,7 @@ clearTimeout(backupTimer);saveBackup();
 try{
 var saved=await call(function(){return api(id?'/writer/chapters/'+id:'/writer/novels/'+nid+'/chapters',id?'PUT':'POST',{title:d.title,body:d.body});});
 if(!saved)return;
-chapterDirty=false;clearTimeout(backupTimer);
+chapterDirty=false;previousWholeReplacement=null;clearTimeout(backupTimer);
 try{localStorage.removeItem(backupKey);}catch(err){}
 chapterId=id||saved.id;
 if(intent==='publish'){
