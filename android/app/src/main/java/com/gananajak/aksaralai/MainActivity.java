@@ -25,6 +25,12 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.widget.LinearLayout;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.graphics.Color;
+import android.graphics.Insets;
 import android.util.Base64;
 import java.io.OutputStream;
 
@@ -52,8 +58,73 @@ public class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+
+        // On Android 15+ the app draws behind system bars by default.
+        // Reserve the *actual* device status/navigation inset heights in native
+        // layout rather than adding a guessed 28px CSS spacer to the web page.
+        final int paper = Color.rgb(255,253,249);
+        final int border = Color.rgb(232,224,237);
+        getWindow().setStatusBarColor(paper);
+        getWindow().setNavigationBarColor(paper);
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+
+        LinearLayout frame = new LinearLayout(this);
+        frame.setOrientation(LinearLayout.VERTICAL);
+        frame.setBackgroundColor(paper);
+
+        View statusStrip = new View(this);
+        statusStrip.setBackgroundColor(paper);
+        frame.addView(statusStrip, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0));
+
+        View statusDivider = new View(this);
+        statusDivider.setBackgroundColor(border);
+        frame.addView(statusDivider, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0));
+
         webView = new WebView(this);
-        setContentView(webView);
+        frame.addView(webView, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        View navStrip = new View(this);
+        navStrip.setBackgroundColor(paper);
+        frame.addView(navStrip, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0));
+
+        setContentView(frame);
+        if (Build.VERSION.SDK_INT >= 35) {
+            frame.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets status = insets.getInsets(WindowInsets.Type.statusBars());
+                Insets navigation = insets.getInsets(WindowInsets.Type.navigationBars());
+                int topHeight = Math.max(0, status.top);
+                int bottomHeight = Math.max(0, navigation.bottom);
+                LinearLayout.LayoutParams statusLayout =
+                    (LinearLayout.LayoutParams) statusStrip.getLayoutParams();
+                if (statusLayout.height != topHeight) {
+                    statusLayout.height = topHeight;
+                    statusStrip.setLayoutParams(statusLayout);
+                }
+                LinearLayout.LayoutParams dividerLayout =
+                    (LinearLayout.LayoutParams) statusDivider.getLayoutParams();
+                int dividerHeight = topHeight > 0 ? Math.max(1, Math.round(getResources()
+                    .getDisplayMetrics().density)) : 0;
+                if (dividerLayout.height != dividerHeight) {
+                    dividerLayout.height = dividerHeight;
+                    statusDivider.setLayoutParams(dividerLayout);
+                }
+                LinearLayout.LayoutParams navLayout =
+                    (LinearLayout.LayoutParams) navStrip.getLayoutParams();
+                if (navLayout.height != bottomHeight) {
+                    navLayout.height = bottomHeight;
+                    navStrip.setLayoutParams(navLayout);
+                }
+                return insets;
+            });
+            frame.requestApplyInsets();
+        }
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
