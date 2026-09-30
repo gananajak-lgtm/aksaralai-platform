@@ -615,3 +615,28 @@ test('format export menu is visible only after the existing admin authorization'
  assert.match(html,/data-export-format="pdf"/);
  assert.match(html,/if\(!button\.isConnected\|\|!permission\.enabled\)return/);
 });
+
+test('whole chapter edit actions preserve the existing segmented mode and allow safe replace/clear/import',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="chapter-edit-all"/);
+ assert.match(html,/id="chapter-edit-chunks" hidden/);
+ assert.match(html,/id="chapter-replace-all"/);
+ assert.match(html,/id="chapter-clear-all"/);
+ assert.match(html,/id="chapter-import-txt"/);
+ assert.match(html,/id="chapter-undo-whole" hidden/);
+ assert.match(html,/wholeEditMode=true;\s*setChapterText\(full\)/);
+ assert.match(html,/wholeEditMode=false;\s*setChapterText\(full\)/);
+ assert.match(html,/if\(!wholeEditMode&&window\.matchMedia\('\(max-width:640px\)'\)\.matches&&text\.length>12000\)/);
+ assert.match(html,/if\(!wholeEditMode&&chapterLength>12000&&window\.matchMedia/);
+ assert.match(html,/var old=joinChapterText\(\)/);
+ assert.match(html,/previousWholeReplacement=old/);
+ assert.match(html,/setChapterText\(nextText\)/);
+ assert.match(html,/scheduleBackup\(\);\s*\/\/ Important: save the new full chapter checkpoint right away/);
+ assert.match(html,/saveBackup\(\);\s*chapterEditor\.focus\(\)/);
+ assert.match(html,/replaceWholeChapter\('','ยืนยันล้างเนื้อหาทุกช่วงของตอนนี้'\)/);
+ assert.match(html,/replaceWholeChapter\(value,'ยืนยันแทนที่เนื้อหาทั้งตอนด้วยข้อความที่วาง'\)/);
+ assert.match(html,/replaceWholeChapter\(incoming,'ยืนยันนำเข้าไฟล์ /);
+ assert.match(html,/previousWholeReplacement=null;\s*undoWholeButton\.hidden=true;\s*setChapterText\(original\)/);
+ assert.match(html,/d\.body=joinChapterText\(\)/);
+ assert.match(html,/if\(!d\.body\.trim\(\)\)\{toast\('กรุณากรอกเนื้อหานิยาย'\)/);
+});
