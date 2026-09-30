@@ -324,3 +324,21 @@ test('novel detail layout gives mobile title and synopsis separate readable rows
  assert.match(html,/\.novel-overview \.novel-cover\{grid-column:1;grid-row:1;width:94px;height:125px;/);
  assert.doesNotMatch(html,/min-width:170px;height:190px/);
 });
+
+test('Android APK uses native Thai TTS bridge, not unsupported WebView speechSynthesis',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ const manifest=fs.readFileSync(new URL('../android/app/src/main/AndroidManifest.xml',import.meta.url),'utf8');
+ assert.match(html,/function androidSpeechEngine\(\)/);
+ assert.match(html,/nativeMode=!!window\.AksaralaiTts/);
+ assert.match(html,/engine=nativeMode\?androidSpeechEngine\(\):window\.speechSynthesis/);
+ assert.match(html,/var utterance=new Utterance\(clean\)/);
+ assert.match(html,/AksaralaiNativeSpeechFeedback/);
+ assert.match(html,/bridge\.speak\(utterance\.text,utterance\.rate/);
+ assert.match(java,/new TextToSpeech\(getApplicationContext\(\), status ->/);
+ assert.match(java,/addJavascriptInterface\(new NativeSpeech\(\), "AksaralaiTts"\)/);
+ assert.match(java,/nativeTts\.setLanguage\(thaiLocale\)/);
+ assert.match(java,/UtteranceProgressListener/);
+ assert.match(java,/nativeTts\.shutdown\(\)/);
+ assert.match(manifest,/android\.intent\.action\.TTS_SERVICE/);
+});
