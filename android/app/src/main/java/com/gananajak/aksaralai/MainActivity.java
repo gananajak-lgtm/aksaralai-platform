@@ -34,6 +34,13 @@ import android.view.WindowManager;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.util.Base64;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.speech.tts.Voice;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.Locale;
+import java.util.Set;
 import java.io.OutputStream;
 
 public class MainActivity extends Activity {
@@ -44,6 +51,74 @@ public class MainActivity extends Activity {
     private static final int MAX_BLOB_BYTES = 15 * 1024 * 1024;
     private WebView webView;
     private ValueCallback<Uri[]> uploadCallback;
+    private TextToSpeech nativeTts;
+    // -1 initializing, 0 unavailable for Thai, 1 ready.
+    private volatile int nativeTtsStatus = -1;
+    private final Locale thaiLocale = new Locale("th", "TH");
+
+    private void reportSpeech(int id, String result) {
+        runOnUiThread(() -> {
+            if (webView != null && trusted(webView.getUrl())) {
+                webView.evaluateJavascript("if(window.AksaralaiNativeSpeechFeedback)window.AksaralaiNativeSpeechFeedback(" +
+                    id + ",'" + result + "');", null);
+            }
+        });
+    }
+
+    private final class NativeSpeech {
+        @JavascriptInterface public int status() {
+            return trusted(webView.getUrl()) ? nativeTtsStatus : 0;
+        }
+
+        @JavascriptInterface public String voices() {
+            if (!trusted(webView.getUrl()) || nativeTtsStatus != 1 || nativeTts == null) return "[]";
+            JSONArray list = new JSONArray();
+            Set<Voice> all = nativeTts.getVoices();
+            if (all == null) return "[]";
+            for (Voice voice : all) {
+                if (voice.getLocale() == null || !voice.getLocale().getLanguage().equals("th")) continue;
+                JSONObject item = new JSONObject();
+                try {
+                    item.put("voiceURI", voice.getName());
+                    item.put("name", voice.getName());
+                    item.put("lang", voice.getLocale().toLanguageTag());
+                    list.put(item);
+                } catch (Exception ignored) {}
+            }
+            return list.toString();
+        }
+
+        @JavascriptInterface public void stop() {
+            if (!trusted(webView.getUrl())) return;
+            runOnUiThread(() -> { if (nativeTts != null) nativeTts.stop(); });
+        }
+
+        @JavascriptInterface public void speak(String words, double speed, String selected, int id) {
+            if (!trusted(webView.getUrl())) return;
+            if (words == null || words.isEmpty() || words.length() > 3000 ||
+                !Double.isFinite(speed) || speed < 0.5 || speed > 2.0 || id < 1) {
+                reportSpeech(id, "error");
+                return;
+            }
+            runOnUiThread(() -> {
+                if (nativeTts == null || nativeTtsStatus != 1) { reportSpeech(id, "error"); return; }
+                if (selected != null && !selected.isEmpty()) {
+                    Voice chosen = null;
+                    Set<Voice> all = nativeTts.getVoices();
+                    if (all != null) for (Voice candidate : all) {
+                        if (candidate.getName().equals(selected) &&
+                            candidate.getLocale() != null &&
+                            "th".equals(candidate.getLocale().getLanguage())) { chosen = candidate; break; }
+                    }
+                    if (chosen != null) nativeTts.setVoice(chosen);
+                    else nativeTts.setLanguage(thaiLocale);
+                } else nativeTts.setLanguage(thaiLocale);
+                nativeTts.setSpeechRate((float)speed);
+                int result = nativeTts.speak(words, TextToSpeech.QUEUE_FLUSH, null, String.valueOf(id));
+                if (result == TextToSpeech.ERROR) reportSpeech(id, "error");
+            });
+        }
+    }
 
     private boolean trusted(String url) {
         if (url == null) return false;
@@ -130,7 +205,7 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         // Distinguish trusted Android app from browser to invoke the native PDF print dialog.
-        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.2");
+        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.3");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -142,6 +217,27 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView,false);
 
         webView.addJavascriptInterface(new Mp3Saver(), "AksaralaiNative");
+        webView.addJavascriptInterface(new NativeSpeech(), "AksaralaiTts");
+        nativeTts = new TextToSpeech(getApplicationContext(), status -> {
+            if (status != TextToSpeech.SUCCESS || nativeTts == null) {
+                nativeTtsStatus = 0;
+                return;
+            }
+            int languageSupport = nativeTts.setLanguage(thaiLocale);
+            nativeTtsStatus = languageSupport == TextToSpeech.LANG_MISSING_DATA ||
+                languageSupport == TextToSpeech.LANG_NOT_SUPPORTED ? 0 : 1;
+            nativeTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String utteranceId) {}
+                @Override public void onDone(String utteranceId) {
+                    try { reportSpeech(Integer.parseInt(utteranceId), "done"); }
+                    catch (NumberFormatException ignored) {}
+                }
+                @Override public void onError(String utteranceId) {
+                    try { reportSpeech(Integer.parseInt(utteranceId), "error"); }
+                    catch (NumberFormatException ignored) {}
+                }
+            });
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
@@ -277,6 +373,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if(uploadCallback!=null){uploadCallback.onReceiveValue(null);uploadCallback=null;}
+        if(nativeTts!=null){nativeTts.stop();nativeTts.shutdown();nativeTts=null;}
         if(webView!=null)webView.destroy();
         super.onDestroy();
     }
