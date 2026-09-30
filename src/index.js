@@ -53,6 +53,58 @@ async function api(req,env){
  }
  if(p==='/api/logout'&&m==='POST'){const token=cookie(req);if(token)await run(db,'DELETE FROM sessions WHERE token_hash=?',await sha(token));return reply({ok:true},200,{'set-cookie':sessionCookie('',0)});}
  if(p==='/api/me'&&m==='GET')return reply({user:await identity(db,req)});
+
+ // The PDF/print view is a separate admin-only tool; no OpenAI key or TTS quota required.
+ if(p==='/api/admin/status'&&m==='GET'){
+  const user=await identity(db,req);
+  return reply({enabled:Boolean(user&&user.role==='writer'&&env.OPENAI_TTS_ADMIN_USERNAME&&user.username===env.OPENAI_TTS_ADMIN_USERNAME)});
+ }
+ if(m==='GET'&&(x=p.match(/^\/api\/admin\/novels\/(\d+)\/manuscript$/))){
+  const user=await author(db,req);
+  if(!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'ส่งออกต้นฉบับได้เฉพาะผู้ดูแล');
+  const novelId=integer(x[1]),book=await own(db,novelId,user);
+  const selected=u.searchParams.get('chapter');
+  let chapters;
+  if(selected!==null){
+   const chapterId=integer(selected);
+   const one=await query(db,'SELECT id,title,body,position FROM chapters WHERE id=? AND novel_id=?',chapterId,novelId);
+   if(!one)failure(404,'ไม่พบตอนที่ต้องการส่งออก');
+   chapters=[one];
+  }else{
+   chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC',novelId);
+  }
+  if(!chapters.length)failure(404,'ยังไม่มีต้นฉบับให้ส่งออก');
+  if(chapters.reduce((n,c)=>n+(c.body||'').length,0)>1200000)failure(413,'ต้นฉบับยาวมาก กรุณาส่งออกทีละตอนเพื่อลดการค้างบนมือถือ');
+  const htmlSafe=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const title=selected!==null?book.title+' — '+chapters[0].title:book.title;
+  const documentHtml=`<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${htmlSafe(title)} — อักษราลัย</title>
+<style>
+@page{size:A4;margin:22mm 18mm 21mm}
+*{box-sizing:border-box}
+body{font-family:"Noto Serif Thai","TH Sarabun New","Noto Sans Thai",serif;color:#251d2b;background:white;line-height:1.8;font-size:15px;margin:0}
+main{max-width:180mm;margin:0 auto;padding:18px 12px}
+h1{font-size:24px;line-height:1.4;text-align:center;margin:18px 0 4px;overflow-wrap:anywhere}
+.byline{text-align:center;font-size:12px;color:#675e6d;margin-bottom:28px}
+.chapter{break-before:page;page-break-before:always}
+.chapter:first-of-type{break-before:auto;page-break-before:auto}
+.chapter h2{text-align:center;font-size:18px;margin:25px 0 22px;line-height:1.4;overflow-wrap:anywhere}
+.body{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;text-align:left}
+.print-tools{position:sticky;top:0;background:#f6f1fa;padding:12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;border-bottom:1px solid #d9cee4;font-family:sans-serif}
+.print-tools button{border:0;border-radius:8px;background:#7852a7;color:white;padding:11px 18px;font-weight:bold;font-size:15px}
+.print-tools small{align-self:center;color:#51445f;font-size:12px}
+@media print{.print-tools{display:none!important}main{max-width:none;margin:0;padding:0}.chapter{break-before:page;page-break-before:always}.chapter:first-of-type{break-before:auto;page-break-before:auto}body{margin:0}h1{margin-top:0}}
+</style></head><body><nav class="print-tools"><button type="button" id="print-manuscript">📄 พิมพ์ / บันทึกเป็น PDF</button><small>เลือก “บันทึกเป็น PDF” ในหน้าต่างพิมพ์</small></nav><main>
+<h1>${htmlSafe(title)}</h1><p class="byline">อักษราลัย · ต้นฉบับส่วนตัว · ${chapters.length} ตอน</p>
+${chapters.map(c=>`<section class="chapter"><h2>${htmlSafe(c.position)}. ${htmlSafe(c.title)}</h2><div class="body">${htmlSafe(c.body)}</div></section>`).join('')}
+</main><script>
+document.getElementById('print-manuscript').addEventListener('click',function(){
+ if(navigator.userAgent.includes('AksaralaiAndroid/'))location.href='aksaralai-print://document';
+ else window.print();
+});
+<\/script></body></html>`;
+  return new Response(documentHtml,{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
+ }
+
  if(p==='/api/novels'&&m==='GET'){
   const term=(u.searchParams.get('q')||'').trim().slice(0,120),genre=(u.searchParams.get('genre')||'').trim().slice(0,40);
   let sql='SELECT n.id,n.title,n.summary,n.genre,n.cover_color,n.updated_at,u.display_name AS author,(SELECT COUNT(*) FROM chapters c WHERE c.novel_id=n.id AND c.published=1) chapter_count FROM novels n JOIN users u ON u.id=n.author_id WHERE n.published=1',bind=[];
