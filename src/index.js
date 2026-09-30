@@ -1,3 +1,4 @@
+import {makeDocx,makePlainText} from './manuscript-export.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -183,6 +184,20 @@ async function api(req,env){
   }
   if(!chapters.length)failure(404,'ยังไม่มีต้นฉบับให้ส่งออก');
   if(chapters.reduce((n,c)=>n+(c.body||'').length,0)>1200000)failure(413,'ต้นฉบับยาวมาก กรุณาส่งออกทีละตอนเพื่อลดการค้างบนมือถือ');
+  const exportFormat=u.searchParams.get('format')||'pdf';
+  if(!['pdf','docx','txt'].includes(exportFormat))failure(400,'รูปแบบไฟล์ไม่ถูกต้อง');
+  if(exportFormat==='docx'||exportFormat==='txt'){
+   const title=selected!==null?book.title+' — '+chapters[0].title:book.title;
+   const safeName=(title.replace(/[\\/\\<>:"|?*\\x00-\\x1f]/g,'_').slice(0,95).trim()||'aksaralai')+'.'+exportFormat;
+   const filename='attachment; filename="aksaralai-manuscript.'+exportFormat+'"; filename*=UTF-8\'\''+encodeURIComponent(safeName);
+   const body=exportFormat==='docx'?makeDocx(title,chapters):makePlainText(title,chapters);
+   return new Response(body,{status:200,headers:{
+    'content-type':exportFormat==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'text/plain; charset=utf-8',
+    'content-disposition':filename,
+    'cache-control':'private, no-store',
+    'x-content-type-options':'nosniff'
+   }});
+  }
   const htmlSafe=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const title=selected!==null?book.title+' — '+chapters[0].title:book.title;
   const documentHtml=`<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${htmlSafe(title)} — อักษราลัย</title>
