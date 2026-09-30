@@ -216,3 +216,11 @@ test('standalone OpenAI studio does not leak provider responses when credits are
   assert.equal(JSON.stringify(r).includes('do not reveal this provider message'),false);
  }finally{globalThis.fetch=original;}
 });
+
+test('local AI Voice Studio launcher stays hidden until admin-only TTS status permits it',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="local-ai-voice-studio"[^>]* hidden>/);
+ assert.match(html,/async function revealAdminLocalVoiceStudio\(\)[\s\S]*?await api\('\/writer\/tts-preview\/status'\)[\s\S]*?status\.enabled\)section\.hidden=false/);
+ assert.match(html,/chapterMp3Uploader\(id\);revealAdminLocalVoiceStudio\(\)/);
+ assert.match(html,/id="voice-studio-open" hidden/);
+});
