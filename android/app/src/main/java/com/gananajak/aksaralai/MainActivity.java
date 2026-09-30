@@ -65,6 +65,7 @@ public class MainActivity extends Activity {
     private List<String> batchPieces = new ArrayList<>();
     private volatile int batchSession = 0;
     private volatile int batchCursor = 0;
+    private volatile int batchBaseIndex = 0;
     private volatile int batchTotal = 0;
     private volatile String batchChapter = "";
     private String batchSignature = "";
@@ -86,6 +87,7 @@ public class MainActivity extends Activity {
         batchPieces.clear();
         batchSession = 0;
         batchCursor = 0;
+        batchBaseIndex = 0;
         batchTotal = 0;
         batchChapter = "";
         batchSignature = "";
@@ -100,7 +102,7 @@ public class MainActivity extends Activity {
                 try {
                     JSONObject progress = new JSONObject();
                     progress.put("signature", batchSignature);
-                    progress.put("index", batchCursor);
+                    progress.put("index", batchBaseIndex + batchCursor);
                     getSharedPreferences("aksaralai-tts", MODE_PRIVATE).edit()
                         .putString("progress." + batchChapter, progress.toString()).apply();
                 } catch (Exception ignored) {}
@@ -108,12 +110,12 @@ public class MainActivity extends Activity {
             // Native Android TTS callback drives the next chunk; no JS timers/background throttling.
             int result = nativeTts.speak(words, TextToSpeech.QUEUE_ADD, null, "B-" + session + "-" + batchCursor);
             if (result == TextToSpeech.ERROR) {
-                reportBatch(session, batchCursor, "error");
+                reportBatch(session, batchBaseIndex + batchCursor, "error");
                 clearBatch(false);
             }
             return;
         }
-        reportBatch(session, batchTotal, "done");
+        reportBatch(session, batchBaseIndex + batchTotal, "done");
         clearBatch(true);
     }
 
@@ -133,7 +135,7 @@ public class MainActivity extends Activity {
             JSONObject state = new JSONObject();
             try {
                 state.put("session", batchSession);
-                state.put("index", batchCursor);
+                state.put("index", batchBaseIndex + batchCursor);
                 state.put("total", batchTotal);
                 state.put("chapter", batchChapter);
             } catch (Exception ignored) {}
@@ -151,11 +153,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface public void speakBatch(String json, double speed, String selected,
-                                                      int session, String chapter, String signature) {
+                                                      int session, String chapter, String signature, int startIndex) {
             if (!trustedTopLevelPage) return;
             if (json == null || json.length() > 600000 || session < 1 ||
                 !Double.isFinite(speed) || speed < 0.5 || speed > 2 ||
-                chapter == null || !chapter.matches("[0-9]{1,12}") ||
+                chapter == null || !chapter.matches("[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
                 signature == null || signature.length() > 512) return;
             final List<String> pieces = new ArrayList<>();
             try {
@@ -180,6 +182,7 @@ public class MainActivity extends Activity {
                 batchSession = session;
                 batchPieces = pieces;
                 batchCursor = 0;
+                batchBaseIndex = startIndex;
                 batchTotal = pieces.size();
                 batchChapter = chapter;
                 batchSignature = signature;
@@ -367,7 +370,7 @@ public class MainActivity extends Activity {
                             int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
                             runOnUiThread(() -> {
                                 if (batchSession==session && batchCursor==pos)
-                                    reportBatch(session,pos,"progress");
+                                    reportBatch(session,batchBaseIndex+pos,"progress");
                             });
                         } catch (NumberFormatException ignored) {}
                     }
@@ -395,7 +398,7 @@ public class MainActivity extends Activity {
                             int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
                             runOnUiThread(() -> {
                                 if(batchSession!=session || batchCursor!=pos) return;
-                                reportBatch(session,pos,"error");
+                                reportBatch(session,batchBaseIndex+pos,"error");
                                 clearBatch(false);
                             });
                         } catch (NumberFormatException ignored) {}
@@ -547,7 +550,7 @@ public class MainActivity extends Activity {
         super.onResume();
         appForeground=true;
         if(webView!=null&&trustedTopLevelPage&&batchSession>0) {
-            reportBatch(batchSession,batchCursor,"progress");
+            reportBatch(batchSession,batchBaseIndex+batchCursor,"progress");
         }
     }
     @Override protected void onPause() {
