@@ -74,7 +74,7 @@
 }
 .ai-format-area{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.ai-format-area .small{margin:6px 0 0}.ai-format-dialog{width:min(94vw,850px);max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);padding:clamp(14px,3vw,25px)}.ai-format-dialog::backdrop{background:#191021a8}.ai-format-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ai-format-compare textarea{width:100%;min-height:220px;max-height:42dvh;white-space:pre-wrap;font-size:14px;line-height:1.6}.ai-format-dialog h2{font-size:19px;margin-top:0}@media(max-width:640px){.ai-format-compare{grid-template-columns:minmax(0,1fr)}.ai-format-compare textarea{min-height:135px;max-height:27dvh}}
 .ai-admin-dialog{border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);width:min(94vw,700px);max-height:90dvh;overflow:auto;padding:0}.ai-admin-dialog::backdrop{background:#261d32af}.ai-admin-inner{padding:clamp(16px,4vw,28px)}.ai-admin-inner h2{margin:0;font-size:22px}.ai-admin-inner textarea{min-height:120px}.ai-admin-inner .panel{margin-top:14px}.ai-admin-inner .controls{gap:8px}.ai-admin-inner .btn{max-width:100%}.manuscript-export-dialog{width:min(92vw,470px);border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);padding:24px}.manuscript-export-dialog::backdrop{background:#261d32a6}.manuscript-export-dialog h2{margin:0 0 10px}.export-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:20px 0}.export-actions .btn{min-height:46px;text-align:center}
-.chapter-edit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:9px 0}.chapter-edit-actions .btn{font-size:14px;min-height:39px;padding:9px 12px}.chapter-edit-actions [id="chapter-clear-all"]{color:#a5263f}@media(max-width:640px){.chapter-edit-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-edit-actions .btn{width:100%;min-width:0;white-space:normal;padding:10px 8px;font-size:13px}}
+.chapter-paste-dialog{width:min(94vw,760px);max-height:90dvh;overflow:auto;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);padding:clamp(12px,3vw,22px)}.chapter-paste-dialog::backdrop{background:#241b30ae}.chapter-paste-dialog h2{font-size:21px}.chapter-paste-dialog textarea{font:inherit;line-height:1.6}.chapter-edit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:9px 0}.chapter-edit-actions .btn{font-size:14px;min-height:39px;padding:9px 12px}.chapter-edit-actions [id="chapter-clear-all"]{color:#a5263f}@media(max-width:640px){.chapter-edit-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-edit-actions .btn{width:100%;min-width:0;white-space:normal;padding:10px 8px;font-size:13px}}
 </style></head>
 <body><header class="top"><div class="shell nav"><div class="brand">✦ <i>อักษราลัย</i></div><button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="mobile-navlinks">☰ เมนู</button><div class="navlinks" id="mobile-navlinks"><button data-go="home">สำรวจนิยาย</button><button data-go="shelf">ชั้นหนังสือ</button><button data-go="studio" id="writer-nav" hidden>สตูดิโอนักเขียน</button><button type="button" id="voice-studio-open" hidden>🎙️ ใช้ OpenAI</button><button type="button" id="ai-admin-open" hidden>🤖 AI แอดมิน</button></div><div class="right"><button id="install" hidden>⬇ ติดตั้ง</button><span class="small" id="account"></span><button data-go="auth" id="authnav">เข้าสู่ระบบ</button></div></div></header>
 <main class="shell layout" id="app" aria-live="polite"></main><footer class="footer">อักษราลัย • แพลตฟอร์มอ่าน เขียน และฟังนิยาย · เวอร์ชันทดลอง</footer><div class="toast hide" id="toast" role="status"></div><dialog class="voice-studio-dialog" id="voice-studio-modal" aria-labelledby="voice-studio-title">
@@ -713,11 +713,18 @@ function replaceWholeChapter(nextText,operation){
  toast('เปลี่ยนเฉพาะในช่องแก้ไขแล้ว กรุณาตรวจและกดบันทึกฉบับร่าง');
  return true;
 }
-replaceAllButton.onclick=function(){
- var text=prompt('วางต้นฉบับใหม่ทั้งตอน (สูงสุด 300,000 ตัวอักษร)\nกดตกลงเพื่อดูคำยืนยันอีกครั้ง ก่อนแทนที่ข้อความเดิม');
- if(text===null)return;
- if(!text.trim()){toast('ต้นฉบับใหม่ต้องมีข้อความ กรุณาใช้ปุ่มล้างเนื้อหาทั้งตอนถ้าต้องการลบทั้งหมด');return;}
- replaceWholeChapter(text,'ยืนยันแทนที่เนื้อหาทั้งตอนด้วยข้อความที่วาง');
+var pasteDialog=document.createElement('dialog');
+pasteDialog.className='chapter-paste-dialog';
+pasteDialog.innerHTML='<h2>📋 วางต้นฉบับใหม่ทั้งตอน</h2><p class="small">ข้อความที่วางจะแทนที่เนื้อหาทุกช่วงของตอนนี้ แต่ยังไม่บันทึกลงเซิร์ฟเวอร์ · สูงสุด 300,000 ตัวอักษร</p><textarea id="chapter-paste-text" placeholder="แตะค้างเพื่อวางต้นฉบับทั้งตอน..." maxlength="300000" style="width:100%;min-height:35dvh;max-height:55dvh"></textarea><p class="small" id="chapter-paste-count">0 / 300,000 ตัวอักษร</p><div class="controls"><button type="button" class="btn" id="chapter-paste-apply">แทนที่ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-paste-cancel">ยกเลิก</button></div>';
+document.getElementById('chapterform').appendChild(pasteDialog);
+var pasteInput=pasteDialog.querySelector('#chapter-paste-text');
+replaceAllButton.onclick=function(){pasteInput.value='';pasteDialog.querySelector('#chapter-paste-count').textContent='0 / 300,000 ตัวอักษร';pasteDialog.showModal();pasteInput.focus();};
+pasteInput.addEventListener('input',function(){pasteDialog.querySelector('#chapter-paste-count').textContent=pasteInput.value.length.toLocaleString('th-TH')+' / 300,000 ตัวอักษร';});
+pasteDialog.querySelector('#chapter-paste-cancel').onclick=function(){pasteDialog.close();};
+pasteDialog.querySelector('#chapter-paste-apply').onclick=function(){
+ var value=pasteInput.value;
+ if(!value.trim()){toast('กรุณาวางต้นฉบับก่อน หรือใช้ปุ่มล้างเนื้อหาทั้งตอน');return;}
+ if(replaceWholeChapter(value,'ยืนยันแทนที่เนื้อหาทั้งตอนด้วยข้อความที่วาง'))pasteDialog.close();
 };
 clearAllButton.onclick=function(){
  replaceWholeChapter('','ยืนยันล้างเนื้อหาทุกช่วงของตอนนี้');
