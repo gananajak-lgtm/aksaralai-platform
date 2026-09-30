@@ -364,7 +364,7 @@ if(index>0)mark();
 }
 async function read(id){if(!user){pendingChapter=id;go('auth');return;}var o=await api('/chapters/'+id),c=o.chapter;var prev=o.chapters.findIndex(function(x){return x.id===c.id});app.innerHTML='<div class="reader '+esc(theme)+'" id="reader" style="--readsize:'+readsize+'px"><div class="row between"><button class="btn ghost" data-go="novel" data-id="'+o.novel.id+'">← สารบัญ</button><span class="small">'+esc(o.novel.title)+'</span></div><h1>'+esc(c.title)+'</h1>'+readerOptions()+'<section class="player" id="mp3-player" hidden><h2>🎧 ฟังไฟล์ MP3 เบื้องหลัง</h2><audio id="mp3-audio" controls preload="metadata" style="width:100%" aria-label="เสียงนิยาย MP3"></audio><p class="small" id="mp3-status">กำลังตรวจสอบไฟล์เสียง...</p><p class="small">กดเล่นก่อนล็อกหน้าจอ ระบบอาจเล่นต่อและควบคุมได้จากหน้าจอล็อก ทั้งนี้ขึ้นอยู่กับเบราว์เซอร์และ Android</p></section>'+player()+'<article class="reader-body" id="reading"></article><div class="toolbar"><button class="btn subtle" id="previous" '+(prev===0?'disabled':'')+'>← ตอนก่อน</button><button class="btn" id="next" '+(prev===o.chapters.length-1?'disabled':'')+'>ตอนต่อไป →</button></div><section class="comments"><h2>ความคิดเห็น</h2><div id="comments"></div><form id="commentform"><label>แสดงความคิดเห็น</label><textarea name="body" maxlength="1000" rows="3" placeholder="แบ่งปันความรู้สึกต่อบทนี้" required></textarea><p><button class="btn">ส่งความคิดเห็น</button></p></form></section></div>';document.getElementById('theme').value=theme;initializeAudio(c.body,c.id);chapterMp3(c.id,c.title,o.novel.title);document.getElementById('previous').onclick=function(){if(prev>0)go('read',o.chapters[prev-1].id);};document.getElementById('next').onclick=function(){if(prev<o.chapters.length-1)go('read',o.chapters[prev+1].id);};document.getElementById('fontdown').onclick=function(){readsize=Math.max(14,readsize-2);resize();};document.getElementById('fontup').onclick=function(){readsize=Math.min(32,readsize+2);resize();};function resize(){document.getElementById('reader').style.setProperty('--readsize',readsize+'px');localStorage.setItem('aksaralai.font',readsize);}document.getElementById('theme').onchange=function(e){theme=e.target.value;localStorage.setItem('aksaralai.theme',theme);document.getElementById('reader').className='reader '+theme;};async function comments(){var o=await api('/chapters/'+id+'/comments');document.getElementById('comments').innerHTML=o.comments.length?o.comments.map(function(c){return '<article><strong>'+esc(c.author)+'</strong><p>'+esc(c.body)+'</p></article>';}).join(''):'<p class="small">ยังไม่มีความคิดเห็น</p>';}await comments();document.getElementById('commentform').onsubmit=async function(e){e.preventDefault();if(!user){toast('กรุณาเข้าสู่ระบบก่อนแสดงความคิดเห็น');return;}var body=new FormData(e.target).get('body');var ok=await call(function(){return api('/chapters/'+id+'/comments','POST',{body:body});});if(ok){e.target.reset();await comments();}};}
 async function studio(){if(!user||user.role!=='writer'){app.innerHTML='<p class="notice">ส่วนนี้สำหรับบัญชีนักเขียนเท่านั้น</p>';return;}var o=await api('/writer/novels');app.innerHTML='<div class="toolbar"><h1>✍️ สตูดิโอนักเขียน</h1><button class="btn" id="create">＋ สร้างนิยาย</button></div><div class="stack">'+(o.novels.length?o.novels.map(function(n){return '<div class="panel row between"><div><h3>'+esc(n.title)+'</h3><span class="small">'+n.chapter_count+' ตอน · '+(n.published?'เผยแพร่แล้ว':'ฉบับร่าง')+'</span></div><button class="btn" data-go="edit" data-id="'+n.id+'">จัดการ</button></div>';}).join(''):'<div class="empty">ยังไม่มีผลงาน กดสร้างนิยายเพื่อเริ่มเขียน</div>')+'</div>';document.getElementById('create').onclick=function(){editNovel(null);};}
-async function revealAdminPdfExport(novelId,chapterId){
+async function revealAdminPdfExport(novelId,chapterId,hasUnsaved){
  var button=document.getElementById(chapterId?'export-chapter-pdf':'export-novel-pdf');
  if(!button)return;
  try{
@@ -372,7 +372,7 @@ async function revealAdminPdfExport(novelId,chapterId){
   if(!button.isConnected||!permission.enabled)return;
   button.hidden=false;
   button.onclick=function(){
-   if(chapterId&&typeof chapterDirty!=='undefined'&&chapterDirty){
+   if(chapterId&&hasUnsaved&&hasUnsaved()){
     if(!confirm('PDF จะใช้ต้นฉบับที่บันทึกล่าสุด การแก้ไขที่ยังไม่บันทึกจะไม่อยู่ในไฟล์ ต้องการดำเนินการต่อหรือไม่?'))return;
    }
    location.assign('/api/admin/novels/'+novelId+'/manuscript'+(chapterId?'?chapter='+chapterId:''));
@@ -489,7 +489,7 @@ try{
    document.getElementById('chapter-backup-state').textContent='กู้คืนข้อความจากอุปกรณ์แล้ว กรุณากดบันทึกฉบับร่าง';
  }
 }catch(err){}
-if(id){chapterMp3Uploader(id);revealAdminLocalVoiceStudio();revealAdminPdfExport(nid,id);}
+if(id){chapterMp3Uploader(id);revealAdminLocalVoiceStudio();revealAdminPdfExport(nid,id,function(){return chapterDirty;});}
 document.getElementById('chapterform').onsubmit=async function(e){
 e.preventDefault();
 var form=e.target,buttons=Array.from(form.querySelectorAll('button[type="submit"]')),intent=e.submitter?.value||'draft',d=Object.fromEntries(new FormData(form)),chapterId=id;
