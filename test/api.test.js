@@ -353,3 +353,61 @@ test('native Android TTS bridge does not access WebView from JavaScript interfac
  assert.match(java,/onPageFinished\(WebView view, String url\) \{\s*trustedTopLevelPage = trusted\(url\)/);
  assert.match(java,/return trustedTopLevelPage \? nativeTtsStatus : 0/);
 });
+
+test('AI paragraph formatting is admin-only and verifies every original character',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'formatowner'});
+ assert.equal((await h.api('/register','POST',{username:'formatowner',display_name:'Owner',password:'long-password-formatter',role:'writer'})).status,201);
+ const owner=h.getCookie();
+ const original='  พรานสิงห์ยืนมองป่า เขาหยุดนิ่งแล้วฟังเสียง\nต่อมาได้ยินเสียงฝีเท้า  ';
+ const formatted='  พรานสิงห์ยืนมองป่า \nเขาหยุดนิ่งแล้วฟังเสียง\nต่อมาได้ยินเสียงฝีเท้า  ';
+ assert.equal((await h.api('/admin/format-text','POST',{text:''})).status,400);
+ assert.equal((await h.api('/admin/format-text','POST',{text:'ท'.repeat(4501)})).status,400);
+ h.clear();
+ assert.equal((await h.api('/admin/format-text','POST',{text:original})).status,401);
+ assert.equal((await h.api('/register','POST',{username:'formatter_other',display_name:'Other',password:'long-password-formatter2',role:'writer'})).status,201);
+ assert.equal((await h.api('/admin/format-text','POST',{text:original})).status,403);
+ h.setCookie(owner);
+ const originalFetch=globalThis.fetch;
+ const responses=[formatted,'พรานสิงห์ยืนมองป่า\nเขาหยุดนิ่งแล้วฟังเสียง\nต่อมาได้ยินเสียงฝีเท้า  ',original.replace('มอง','เห็น'),original+'ข้อความเพิ่มเติม'];
+ let called=0;
+ globalThis.fetch=async(url,opts)=>{
+  assert.equal(url,'https://api.openai.com/v1/chat/completions');
+  assert.equal(opts.headers.authorization,'Bearer fake-test-key');
+  const body=JSON.parse(opts.body);
+  assert.equal(body.model,'gpt-4o-mini');
+  assert.equal(body.messages[1].content.endsWith(original),true);
+  return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({formatted:responses[called++]})}}]}),{status:200,headers:{'content-type':'application/json'}});
+ };
+ try{
+  const good=await h.api('/admin/format-text','POST',{text:original});
+  assert.equal(good.status,200);assert.equal(good.formatted,formatted);assert.equal(good.added_breaks,1);
+  assert.equal((await h.api('/admin/format-text','POST',{text:original})).status,422);
+  assert.equal((await h.api('/admin/format-text','POST',{text:original})).status,422);
+  assert.equal((await h.api('/admin/format-text','POST',{text:original})).status,422);
+  assert.equal(called,4);
+ }finally{globalThis.fetch=originalFetch;}
+});
+
+test('AI paragraph formatter returns safe errors and never exposes provider messages',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'formatfail'});
+ assert.equal((await h.api('/register','POST',{username:'formatfail',display_name:'Owner',password:'long-password-formatter3',role:'writer'})).status,201);
+ const old=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:{code:'insufficient_quota',message:'Private provider details'}}),{status:429,headers:{'content-type':'application/json'}});
+ try{
+  const result=await h.api('/admin/format-text','POST',{text:'ข้อความไทย'});
+  assert.equal(result.status,502);assert.match(result.detail,/เครดิต/);
+  assert.equal(JSON.stringify(result).includes('Private provider details'),false);
+ }finally{globalThis.fetch=old;}
+});
+
+test('admin manuscript formatting UI previews without changing the manuscript until confirmed',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="ai-format-section" hidden/);
+ assert.match(html,/id="ai-format-preview"/);
+ assert.match(html,/id="ai-format-before"/);
+ assert.match(html,/id="ai-format-after"/);
+ assert.match(html,/await api\('\/admin\/format-text','POST',\{text:original\}\)/);
+ assert.match(html,/if\(current\.slice\(pending\.start,pending\.end\)!==pending\.original\)/);
+ assert.match(html,/chapterEditor\.dispatchEvent\(new Event\('input'/);
+ assert.match(html,/await api\('\/writer\/tts-preview\/status'\)/);
+});
