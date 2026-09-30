@@ -659,11 +659,20 @@ test('SPA browser Back follows history and Home exits without logging out',()=>{
  assert.match(html,/if\(route==='auth'&&user\)\{[\s\S]*?await api\('\/logout','POST',\{\}\)/);
 });
 
-test('Android hardware Back invokes SPA route handler and exits the app at Home',()=>{
+test('Android hardware Back asks confirmation at Home and retains sign-in on cancel/exit',()=>{
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
  assert.match(java,/evaluateJavascript\([\s\S]{0,210}window\.aksaralaiAndroidBack/);
  assert.match(java,/if \("\\\"handled\\\""\.equals\(response\)\) return/);
- assert.match(java,/if \("\\\"exit\\\""\.equals\(response\)\) \{ finish\(\); return; \}/);
+ assert.match(java,/if \("\\\"exit\\\""\.equals\(response\)\) \{ confirmCloseApp\(\); return; \}/);
+ assert.match(java,/private void confirmCloseApp\(\)/);
+ assert.match(java,/\.setTitle\("ปิดแอปอักษราลัย"\)/);
+ assert.match(java,/\.setMessage\("ต้องการปิดแอปหรือไม่\? ระบบจะเก็บการเข้าสู่ระบบไว้"\)/);
+ assert.match(java,/\.setNegativeButton\("ยกเลิก"/);
+ assert.match(java,/\.setPositiveButton\("ปิดแอป", \(dialog, which\) -> finish\(\)\)/);
+ assert.match(java,/\.setOnDismissListener\(dialog -> closePromptShowing = false\)/);
+ assert.match(java,/if \(isFinishing\(\) \|\| isDestroyed\(\) \|\| closePromptShowing\) return/);
+ assert.match(java,/else confirmCloseApp\(\)/);
+ assert.doesNotMatch(java,/if \("\\\"exit\\\""\.equals\(response\)\) \{ finish\(\)/);
  assert.match(java,/onJsConfirm\(WebView view, String url, String message, JsResult result\)/);
  assert.match(java,/new AlertDialog\.Builder\(MainActivity\.this\)/);
  assert.match(java,/\.setNegativeButton\("ยกเลิก"/);
