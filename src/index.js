@@ -125,7 +125,8 @@ async function api(req,env){
  if(m==='GET'&&p==='/api/writer/tts-preview/status'){
   const user=await author(db,req);
   const enabled=Boolean(env.OPENAI_API_KEY&&env.OPENAI_TTS_ADMIN_USERNAME&&user.username===env.OPENAI_TTS_ADMIN_USERNAME);
-  if(!enabled)return reply({enabled:false,checks:{api_key_present:Boolean(env.OPENAI_API_KEY),admin_username_present:Boolean(env.OPENAI_TTS_ADMIN_USERNAME),username_matches:Boolean(env.OPENAI_TTS_ADMIN_USERNAME&&user.username===env.OPENAI_TTS_ADMIN_USERNAME)}});
+  // Non-admin writers must not learn whether paid AI integrations or credentials are configured.
+  if(!enabled)return reply({enabled:false});
   const day=new Date().toISOString().slice(0,10);
   const usage=await query(db,'SELECT used FROM tts_preview_usage WHERE day_utc=? AND username=?',day,user.username);
   return reply({enabled:true,remaining:Math.max(0,3-(usage?.used||0)),daily_limit:3});
