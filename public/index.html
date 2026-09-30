@@ -128,6 +128,7 @@ async function go(route,id,fromHistory){
   historyDepth++;
   history.pushState({aksaralai:true,route:route,id:id||null,depth:historyDepth},'',routeHash(route,id));
  }
+ if(typeof window.aksaralaiPreserveDraft==='function'){try{window.aksaralaiPreserveDraft();}catch(e){}window.aksaralaiPreserveDraft=null;}
  stop();current={route:route,id:id};
  app.innerHTML='<p class="notice">กำลังโหลด...</p>';
  try{if(route==='home')await home();else if(route==='auth')auth();else if(route==='shelf')await shelf();else if(route==='studio')await studio();else if(route==='novel')await showNovel(id);else if(route==='read')await read(id);else if(route==='edit')await editNovel(id);else if(route==='edit-chapter')await editChapter(id);else await home();}
@@ -674,6 +675,7 @@ function saveBackup(){
   document.getElementById('chapter-backup-state').textContent='พื้นที่สำรองในอุปกรณ์ไม่เพียงพอ กรุณากดบันทึกฉบับร่าง';
  }
 }
+window.aksaralaiPreserveDraft=function(){if(chapterDirty){clearTimeout(backupTimer);saveBackup();}};
 function scheduleBackup(){
  chapterDirty=true;clearTimeout(backupTimer);
  document.getElementById('chapter-backup-state').textContent='มีการแก้ไขที่ยังไม่บันทึก';
