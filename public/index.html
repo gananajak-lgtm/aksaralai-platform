@@ -328,6 +328,10 @@ function androidSpeechEngine(){
  };
  return {
   native:true,onvoiceschanged:null,
+  batchAvailable:typeof bridge.speakBatch==='function',
+  batch:function(parts,speed,voice,session,chapter,signature,start){bridge.speakBatch(JSON.stringify(parts),speed,voice,session,String(chapter),signature,start);},
+  batchState:function(){try{return JSON.parse(bridge.batchState());}catch(e){return {};}},
+  savedBatchIndex:function(chapter,signature){try{return bridge.savedBatchIndex(String(chapter),signature);}catch(e){return 0;}},
   ready:function(){try{return bridge.status();}catch(e){return 0;}},
   getVoices:function(){try{return JSON.parse(bridge.voices());}catch(e){return [];}},
   cancel:function(){current=null;try{bridge.stop();}catch(e){}},
@@ -341,7 +345,7 @@ function androidSpeechEngine(){
 function initializeAudio(body,chapterId){
 var nativeMode=!!window.AksaralaiTts,engine=nativeMode?androidSpeechEngine():window.speechSynthesis,Utterance=nativeMode?function(text){this.text=text;this.lang='th-TH';this.rate=1;this.voice=null;}:window.SpeechSynthesisUtterance;
 var parts=splitText(body),box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
-var storageKey='aksaralai.tts.chapter.'+chapterId;
+var storageKey='aksaralai.tts.chapter.'+chapterId, nativeBatchMode=nativeMode&&engine.batchAvailable,batchBase=0;
 var pronWord=document.getElementById('pron-word'),pronSound=document.getElementById('pron-sound'),pronAdd=document.getElementById('pron-add'),pronEntriesBox=document.getElementById('pron-entries');
 function showPronunciations(){
  var entries=pronunciationEntries();pronEntriesBox.innerHTML=entries.length?entries.map(function(e,i){return '<div class="row between" style="margin-top:8px"><span>'+esc(e.word)+' → '+esc(e.sound)+'</span><button type="button" class="btn ghost" data-pron-delete="'+i+'">ลบ</button></div>';}).join(''):'ยังไม่มีคำอ่านที่กำหนด';
@@ -366,6 +370,7 @@ function checkpoint(){
 function clearCheckpoint(){try{localStorage.removeItem(storageKey);}catch(e){}try{sessionStorage.removeItem(storageKey);}catch(e){}}
 function saveBeforeExit(){if(active||index>0)checkpoint();}
 index=saved();
+if(nativeBatchMode)index=Math.max(index,Math.min(parts.length-1,engine.savedBatchIndex(chapterId,signature)));
 box.innerHTML=parts.map(function(text,i){return '<span data-segment="'+i+'">'+esc(text)+'</span>'}).join('');
 if(!engine||!Utterance){button.disabled=true;restartButton.disabled=true;state.textContent='อุปกรณ์นี้ไม่รองรับการอ่านเสียง';return;}
 if(nativeMode){
@@ -414,7 +419,37 @@ function say(t){
 }
 // Android TTS engines may silently drop speak() when it immediately follows cancel().
 // Defer the replacement utterance to give the engine time to release its old queue.
-function playFromCheckpoint(){var mp3=document.getElementById('mp3-audio');if(mp3&&typeof mp3.pause==='function'&&!mp3.paused)mp3.pause();ticket++;var current=ticket;active=true;paused=false;engine.cancel();status();setTimeout(function(){if(active&&!paused&&current===ticket)say(current);},200);}
+function playFromCheckpoint(){var mp3=document.getElementById('mp3-audio');if(mp3&&typeof mp3.pause==='function'&&!mp3.paused)mp3.pause();ticket++;var current=ticket;active=true;paused=false;engine.cancel();status();
+ if(nativeBatchMode){
+  batchBase=index;
+  var prepared=parts.slice(index).map(function(raw,pos){
+   if(pos===0&&offset>0)raw=raw.slice(offset);
+   return pronunciationText(speechText(raw),pronunciationEntries());
+  });
+  if(!prepared.length){active=false;index=0;offset=0;status();return;}
+  // The complete queue now lives in Android. Its onDone callback starts the next
+  // segment natively even when WebView timers are throttled behind the lock screen.
+  engine.batch(prepared,speed,voice.value,current,chapterId,signature,batchBase);
+  return;
+ }
+ setTimeout(function(){if(active&&!paused&&current===ticket)say(current);},200);
+}
+if(nativeBatchMode){
+ window.AksaralaiNativeBatchFeedback=function(session,position,event){
+  if(!active||session!==ticket)return;
+  if(event==='error'){active=false;checkpoint();status();toast('Android หยุดอ่านเสียง กรุณากดฟังต่อ');return;}
+  if(event==='done'){active=false;index=0;offset=0;clearCheckpoint();status();return;}
+  index=Math.max(0,Math.min(parts.length-1,position));offset=0;
+  checkpoint();mark();status();
+ };
+ document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible'||!active)return;
+  var state=engine.batchState();
+  if(state.session!==ticket||String(state.chapter)!==String(chapterId))return;
+  index=Math.max(0,Math.min(parts.length-1,state.index));offset=0;
+  checkpoint();mark();status();
+ });
+}
 button.onclick=function(){
  if(!active){playFromCheckpoint();return;}
  if(paused){playFromCheckpoint();return;}
