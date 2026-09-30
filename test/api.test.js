@@ -486,9 +486,56 @@ test('AI admin UI is hidden for regular writers and requires confirmation for na
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  assert.match(html,/id="ai-admin-open" hidden/);
  assert.match(html,/id="ai-admin-dialog"/);
- assert.match(html,/await api\('\/admin\/assistant','POST',\{message:message\}\)/);
+ assert.match(html,/await api\('\/admin\/assistant','POST',\{message:message,chapter_id:contextChapter\}\)/);
  assert.match(html,/assistant\.hidden=!tts\.enabled/);
  assert.match(html,/confirm\.onclick=function\(\)/);
  assert.match(html,/if\(task\.action==='open_studio'\)go\('studio'\)/);
  assert.doesNotMatch(html,/new Function\(/);
+});
+
+test('AI admin formatter command uses the current owned chapter instead of refusing',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'activeowner'});
+ assert.equal((await h.api('/register','POST',{username:'activeowner',display_name:'Owner',password:'long-password-activeowner',role:'writer'})).status,201);
+ const ownerCookie=h.getCookie();
+ const n=await h.api('/writer/novels','POST',{title:'หมู่บ้านลึกลับ',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนหนึ่ง',body:'ห้ามปรับเนื้อหาเดิม'});
+ const old=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({reply:'ทำไม่ได้',action:'none',novel_id:null,chapter_id:null})}}]}),{status:200,headers:{'content-type':'application/json'}});
+ try{
+  const response=await h.api('/admin/assistant','POST',{message:'จัดแถวและย่อหน้าให้เรียงตามความเหมาะสม ไม่ต้องเว้นบรรทัด',chapter_id:c.id});
+  assert.equal(response.status,200);
+  assert.equal(response.proposal.action,'format_chapter');
+  assert.equal(response.proposal.chapter_id,c.id);
+  assert.match(response.reply,/เครื่องมือจัดย่อหน้า/);
+  assert.doesNotMatch(response.reply,/ทำไม่ได้/);
+  const unknown=await h.api('/admin/assistant','POST',{message:'จัดย่อหน้า',chapter_id:999999});
+  assert.equal(unknown.proposal,null);
+ }finally{globalThis.fetch=old;}
+ assert.equal((await h.api('/chapters/'+c.id)).chapter.body,'ห้ามปรับเนื้อหาเดิม');
+ h.clear();
+ assert.equal((await h.api('/admin/assistant','POST',{message:'จัดย่อหน้า',chapter_id:c.id})).status,401);
+ h.setCookie(ownerCookie);
+});
+
+test('AI formatter never introduces extra empty lines',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'noblanks'});
+ assert.equal((await h.api('/register','POST',{username:'noblanks',display_name:'Owner',password:'long-password-noblanks',role:'writer'})).status,201);
+ const old=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({formatted:'สวัสดี\n\nครับ'})}}]}),{status:200,headers:{'content-type':'application/json'}});
+ try{
+  const response=await h.api('/admin/format-text','POST',{text:'สวัสดีครับ'});
+  assert.equal(response.status,422);
+  assert.match(response.detail,/บรรทัดว่าง/);
+ }finally{globalThis.fetch=old;}
+});
+
+test('confirmed admin formatter action opens the selected editor and the existing review flow',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/pendingFormatChapterId=task.chapter_id/);
+ assert.match(html,/Number\(pendingFormatChapterId\)===Number\(id\)/);
+ assert.match(html,/trigger\.click\(\)/);
+ assert.match(html,/confirm\('ยืนยันให้ OpenAI ช่วยจัดย่อหน้าข้อความ /);
+ assert.match(html,/dialog\.showModal\(\)/);
+ assert.match(html,/id="ai-format-before"/);
+ assert.match(html,/id="ai-format-after"/);
 });
