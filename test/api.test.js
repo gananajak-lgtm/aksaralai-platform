@@ -425,3 +425,70 @@ test('Android background TTS advances in native onDone without WebView JavaScrip
  assert.match(html,/AksaralaiNativeBatchFeedback/);
  assert.match(html,/engine\.batchState\(\)/);
 });
+
+test('AI admin assistant is admin-only, read-only and proposes only validated owner actions',async()=>{
+ const h=harness({OPENAI_API_KEY:'test-api-key',OPENAI_TTS_ADMIN_USERNAME:'controlowner'});
+ assert.equal((await h.api('/register','POST',{username:'controlowner',display_name:'Admin',password:'long-password-control1',role:'writer'})).status,201);
+ const adminCookie=h.getCookie();
+ const n=await h.api('/writer/novels','POST',{title:'เรื่องลึกลับ',summary:'คำโปรย',genre:'ลึกลับ',cover_color:'#7453a8'});
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนที่หนึ่ง',body:'ข้อความต้นฉบับห้ามเปลี่ยน'});
+ assert.equal((await h.api('/admin/assistant','POST',{message:''})).status,400);
+ h.clear();
+ assert.equal((await h.api('/admin/assistant','POST',{message:'ดูนิยาย'})).status,401);
+ assert.equal((await h.api('/register','POST',{username:'writer_other_ai',display_name:'Other',password:'long-password-control2',role:'writer'})).status,201);
+ const other=await h.api('/writer/novels','POST',{title:'ข้อมูลคนอื่น',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ assert.equal((await h.api('/admin/assistant','POST',{message:'ดูนิยาย'})).status,403);
+ h.setCookie(adminCookie);
+ const originalFetch=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async(url,opts)=>{
+  assert.equal(url,'https://api.openai.com/v1/chat/completions');
+  assert.equal(opts.headers.authorization,'Bearer test-api-key');
+  const req=JSON.parse(opts.body);
+  assert.equal(req.model,'gpt-4o-mini');
+  assert.ok(req.messages[1].content.includes('เรื่องลึกลับ'));
+  assert.ok(!req.messages[1].content.includes('ข้อมูลคนอื่น'));
+  assert.ok(!req.messages[1].content.includes('ข้อความต้นฉบับห้ามเปลี่ยน'));
+  const choices=[
+   {reply:'พบตอนที่ต้องการ กดปุ่มเพื่อเปิดหน้าแก้ไข',action:'format_chapter',novel_id:n.id,chapter_id:c.id},
+   {reply:'เปิดเรื่องอื่น',action:'open_novel',novel_id:other.id,chapter_id:null},
+   {reply:'ลบข้อมูลทั้งหมด',action:'delete_everything',novel_id:n.id,chapter_id:c.id}
+  ];
+  const selected=choices[calls++];
+  return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(selected)}}]}),{status:200,headers:{'content-type':'application/json'}});
+ };
+ try{
+  const good=await h.api('/admin/assistant','POST',{message:'เปิดตอนที่หนึ่งแล้วช่วยจัดย่อหน้า'});
+  assert.equal(good.status,200);
+  assert.deepEqual(good.proposal,{action:'format_chapter',label:'เปิดหน้าแก้ไขตอนเพื่อใช้ AI จัดย่อหน้า',novel_id:n.id,chapter_id:c.id});
+  const illegalId=await h.api('/admin/assistant','POST',{message:'เปิดเรื่องอื่น'});
+  assert.equal(illegalId.status,200);assert.equal(illegalId.proposal,null);
+  const illegalAction=await h.api('/admin/assistant','POST',{message:'ลบทุกอย่าง'});
+  assert.equal(illegalAction.status,200);assert.equal(illegalAction.proposal,null);
+  assert.equal(calls,3);
+  assert.equal((await h.api('/chapters/'+c.id)).chapter.body,'ข้อความต้นฉบับห้ามเปลี่ยน');
+ }finally{globalThis.fetch=originalFetch;}
+});
+
+test('AI admin assistant does not leak model provider failures',async()=>{
+ const h=harness({OPENAI_API_KEY:'test-api-key',OPENAI_TTS_ADMIN_USERNAME:'adminfailure'});
+ assert.equal((await h.api('/register','POST',{username:'adminfailure',display_name:'Admin',password:'long-password-control3',role:'writer'})).status,201);
+ const old=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:{code:'insufficient_quota',message:'internal provider secret message'}}),{status:429,headers:{'content-type':'application/json'}});
+ try{
+  const result=await h.api('/admin/assistant','POST',{message:'สรุปรายการนิยาย'});
+  assert.equal(result.status,502);assert.match(result.detail,/เครดิต/);
+  assert.equal(JSON.stringify(result).includes('internal provider secret message'),false);
+ }finally{globalThis.fetch=old;}
+});
+
+test('AI admin UI is hidden for regular writers and requires confirmation for navigation',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="ai-admin-open" hidden/);
+ assert.match(html,/id="ai-admin-dialog"/);
+ assert.match(html,/await api\('\/admin\/assistant','POST',\{message:message\}\)/);
+ assert.match(html,/assistant\.hidden=!tts\.enabled/);
+ assert.match(html,/confirm\.onclick=function\(\)/);
+ assert.match(html,/if\(task\.action==='open_studio'\)go\('studio'\)/);
+ assert.doesNotMatch(html,/new Function\(/);
+});
