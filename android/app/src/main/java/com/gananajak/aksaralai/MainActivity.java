@@ -25,6 +25,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.print.PrintManager;
+import android.print.PrintAttributes;
 import android.widget.LinearLayout;
 import android.view.View;
 import android.view.WindowInsets;
@@ -127,6 +129,8 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        // Distinguish trusted Android app from browser to invoke the native PDF print dialog.
+        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.2");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -141,6 +145,22 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
+                if ("aksaralai-print".equalsIgnoreCase(request.getUrl().getScheme())) {
+                    // Only the owner's authenticated printable manuscript page can invoke printing.
+                    String currentUrl = view.getUrl();
+                    if ("aksaralai-print://document".equals(url) &&
+                        trusted(currentUrl) &&
+                        Uri.parse(currentUrl).getPath().matches("/api/admin/novels/[0-9]+/manuscript")) {
+                        PrintManager manager=(PrintManager)getSystemService(Context.PRINT_SERVICE);
+                        if(manager!=null) {
+                            manager.print("อักษราลัย - ต้นฉบับ",
+                                view.createPrintDocumentAdapter("ต้นฉบับอักษราลัย"),
+                                new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setMinMargins(PrintAttributes.Margins.NO_MARGINS).build());
+                        } else message("ระบบพิมพ์ PDF ไม่พร้อมใช้งาน");
+                    }
+                    return true;
+                }
                 if (trusted(url)) return false;
                 try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
                 catch (Exception ignored) { message("ไม่สามารถเปิดลิงก์นี้ได้"); }
