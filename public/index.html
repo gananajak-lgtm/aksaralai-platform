@@ -868,7 +868,14 @@ try{
   finally{busy=false;trigger.disabled=false;}
  };
  api('/writer/tts-preview/status').then(function(status){
-  if(section.isConnected&&status.enabled)section.hidden=false;
+  if(section.isConnected&&status.enabled){
+   section.hidden=false;
+   if(id&&Number(pendingFormatChapterId)===Number(id)){
+    pendingFormatChapterId=null;
+    note.textContent='AI แอดมินเปิดเครื่องมือจัดย่อหน้าให้แล้ว ตรวจข้อความก่อนสั่ง OpenAI ได้';
+    trigger.click();
+   }
+  }
  }).catch(function(){section.hidden=true;});
 })();
 
