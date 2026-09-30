@@ -72,6 +72,7 @@
  .novel-detail .chapter-item span{min-width:0;overflow-wrap:anywhere}
  .novel-detail .chapter-item .btn{flex-shrink:0;font-size:13px}
 }
+.ai-format-area{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.ai-format-area .small{margin:6px 0 0}.ai-format-dialog{width:min(94vw,850px);max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);padding:clamp(14px,3vw,25px)}.ai-format-dialog::backdrop{background:#191021a8}.ai-format-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ai-format-compare textarea{width:100%;min-height:220px;max-height:42dvh;white-space:pre-wrap;font-size:14px;line-height:1.6}.ai-format-dialog h2{font-size:19px;margin-top:0}@media(max-width:640px){.ai-format-compare{grid-template-columns:minmax(0,1fr)}.ai-format-compare textarea{min-height:135px;max-height:27dvh}}
 </style></head>
 <body><header class="top"><div class="shell nav"><div class="brand">✦ <i>อักษราลัย</i></div><button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="mobile-navlinks">☰ เมนู</button><div class="navlinks" id="mobile-navlinks"><button data-go="home">สำรวจนิยาย</button><button data-go="shelf">ชั้นหนังสือ</button><button data-go="studio" id="writer-nav" hidden>สตูดิโอนักเขียน</button><button type="button" id="voice-studio-open" hidden>🎙️ ใช้ OpenAI</button></div><div class="right"><button id="install" hidden>⬇ ติดตั้ง</button><span class="small" id="account"></span><button data-go="auth" id="authnav">เข้าสู่ระบบ</button></div></div></header>
 <main class="shell layout" id="app" aria-live="polite"></main><footer class="footer">อักษราลัย • แพลตฟอร์มอ่าน เขียน และฟังนิยาย · เวอร์ชันทดลอง</footer><div class="toast hide" id="toast" role="status"></div><dialog class="voice-studio-dialog" id="voice-studio-modal" aria-labelledby="voice-studio-title">
@@ -451,7 +452,7 @@ async function editNovel(id){if(!user||user.role!=='writer')return go('auth');va
 async function editChapter(id){var o=await api('/chapters/'+id),c=o.chapter;chapterForm(c.novel_id,c);}
 function chapterForm(nid,chapter){
 var id=chapter?.id;
-app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📄 ส่งออกตอนนี้เป็น PDF</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px" hidden><h2>🎙️ AI Voice Studio (ฟรีบนคอมพิวเตอร์)</h2><p class="small">เปิดโปรแกรม AI Voice Studio ที่ติดตั้งบนเครื่องของคุณเพื่อสร้างเสียงด้วย VachanaTTS โดยไม่ใช้เครดิต OpenAI</p><p><a class="btn" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">เปิด AI Voice Studio ฟรี ↗</a></p><p class="small">ต้องติดตั้งและเปิดโปรแกรม AI Voice Studio บนคอมพิวเตอร์เครื่องที่กดปุ่มก่อน · บนมือถือหรือคอมพิวเตอร์ที่ไม่มีโปรแกรมนี้ ลิงก์จะยังใช้งานไม่ได้ · ไฟล์ MP3 ที่สร้างเสร็จสามารถอัปโหลดด้วยปุ่มด้านบน</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
+app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><section class="ai-format-area" id="ai-format-section" hidden><button type="button" class="btn subtle" id="ai-format-button">✨ OpenAI ช่วยจัดย่อหน้า</button><p class="small" id="ai-format-message" role="status">ใช้เฉพาะข้อความช่วงที่กำลังแก้ หรือเลือกข้อความไม่เกิน 4,500 ตัวอักษร · ใช้เครดิต API จริง · ไม่แก้ต้นฉบับโดยอัตโนมัติ</p></section><dialog class="ai-format-dialog" id="ai-format-preview"><h2>✨ ตรวจทานก่อนใช้การจัดย่อหน้า</h2><p class="small" id="ai-format-breaks"></p><div class="ai-format-compare"><div><label for="ai-format-before">ข้อความเดิม</label><textarea id="ai-format-before" readonly></textarea></div><div><label for="ai-format-after">ข้อความที่ AI เสนอ</label><textarea id="ai-format-after" readonly></textarea></div></div><p class="small">ระบบยืนยันแล้วว่า AI ไม่แก้หรือลบอักขระเดิม แต่คุณควรตรวจการแบ่งย่อหน้าก่อนยอมรับ</p><div class="controls"><button type="button" class="btn" id="ai-format-accept">ใช้การจัดย่อหน้านี้</button><button type="button" class="btn ghost" id="ai-format-cancel">ยกเลิก</button></div></dialog><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📄 ส่งออกตอนนี้เป็น PDF</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px" hidden><h2>🎙️ AI Voice Studio (ฟรีบนคอมพิวเตอร์)</h2><p class="small">เปิดโปรแกรม AI Voice Studio ที่ติดตั้งบนเครื่องของคุณเพื่อสร้างเสียงด้วย VachanaTTS โดยไม่ใช้เครดิต OpenAI</p><p><a class="btn" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">เปิด AI Voice Studio ฟรี ↗</a></p><p class="small">ต้องติดตั้งและเปิดโปรแกรม AI Voice Studio บนคอมพิวเตอร์เครื่องที่กดปุ่มก่อน · บนมือถือหรือคอมพิวเตอร์ที่ไม่มีโปรแกรมนี้ ลิงก์จะยังใช้งานไม่ได้ · ไฟล์ MP3 ที่สร้างเสร็จสามารถอัปโหลดด้วยปุ่มด้านบน</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
 var chapterEditor=document.querySelector('#chapterform textarea[name="body"]'),chapterCounter=document.getElementById('chapter-counter');
 var chapterTitle=document.querySelector('#chapterform input[name="title"]');
 var startingBody=chapter?.body||'',chapterSegments=null,activeSegment=0,chapterLength=startingBody.length;
@@ -557,6 +558,73 @@ try{
    document.getElementById('chapter-backup-state').textContent='กู้คืนข้อความจากอุปกรณ์แล้ว กรุณากดบันทึกฉบับร่าง';
  }
 }catch(err){}
+// The admin-only formatter only ever applies a reviewed, insert-newlines-only proposal
+// to the current text selection or one mobile editing chunk.
+(function setupAdminFormatting(){
+ var section=document.getElementById('ai-format-section');
+ var trigger=document.getElementById('ai-format-button');
+ var note=document.getElementById('ai-format-message');
+ var dialog=document.getElementById('ai-format-preview');
+ var before=document.getElementById('ai-format-before');
+ var after=document.getElementById('ai-format-after');
+ var pending=null, busy=false;
+ document.getElementById('ai-format-cancel').onclick=function(){dialog.close();pending=null;};
+ document.getElementById('ai-format-accept').onclick=function(){
+  if(!pending)return;
+  if(chapterSegments&&activeSegment!==pending.segment){
+   note.textContent='คุณเปลี่ยนช่วงระหว่างตรวจผล AI กรุณาเริ่มใหม่';
+   dialog.close();pending=null;return;
+  }
+  var current=chapterEditor.value;
+  if(current.slice(pending.start,pending.end)!==pending.original){
+   note.textContent='ข้อความต้นฉบับถูกแก้ไขไปแล้ว กรุณาเริ่มใหม่เพื่อป้องกันข้อมูลสูญหาย';
+   dialog.close();pending=null;return;
+  }
+  if(current.length-pending.original.length+pending.formatted.length>chapterEditor.maxLength){
+   note.textContent='ข้อความหลังจัดเกินขนาดช่องแก้ไข กรุณาเลือกข้อความให้สั้นลง';
+   dialog.close();pending=null;return;
+  }
+  chapterEditor.value=current.slice(0,pending.start)+pending.formatted+current.slice(pending.end);
+  chapterEditor.dispatchEvent(new Event('input',{bubbles:true}));
+  chapterEditor.setSelectionRange(pending.start+pending.formatted.length,pending.start+pending.formatted.length);
+  note.textContent='นำผลจัดย่อหน้าไปใช้ในช่องแก้ไขแล้ว · อย่าลืมกดบันทึกฉบับร่าง';
+  pending=null;dialog.close();
+ };
+ trigger.onclick=async function(){
+  if(busy)return;
+  var value=chapterEditor.value,start=chapterEditor.selectionStart,end=chapterEditor.selectionEnd;
+  if(start===end){
+   if(value.length>4500){
+    note.textContent='ข้อความช่วงนี้ยาวกว่า 4,500 ตัวอักษร กรุณาลากเลือกเฉพาะส่วนที่ต้องการจัด แล้วกดอีกครั้ง';return;
+   }
+   start=0;end=value.length;
+  }
+  var original=value.slice(start,end);
+  if(!original.trim()){note.textContent='กรุณาเลือกข้อความที่ต้องการจัดย่อหน้า';return;}
+  if(original.length>4500){note.textContent='กรุณาเลือกข้อความครั้งละไม่เกิน 4,500 ตัวอักษร';return;}
+  if(!confirm('ยืนยันให้ OpenAI ช่วยจัดย่อหน้าข้อความ '+original.length.toLocaleString('th-TH')+' ตัวอักษร? มีค่าใช้เครดิต API จริง และไม่บันทึกทับต้นฉบับอัตโนมัติ'))return;
+  var segment=activeSegment;
+  busy=true;trigger.disabled=true;note.textContent='กำลังให้ OpenAI เสนอการแบ่งย่อหน้า กรุณารอสักครู่';
+  try{
+   var result=await api('/admin/format-text','POST',{text:original});
+   if(!section.isConnected)return;
+   if(chapterSegments&&activeSegment!==segment)throw Error('คุณเปลี่ยนช่วงระหว่าง AI ประมวลผล กรุณาลองใหม่');
+   if(chapterEditor.value.slice(start,end)!==original)throw Error('ต้นฉบับเปลี่ยนระหว่าง AI ประมวลผล จึงไม่ใช้ผลที่ได้');
+   if(typeof result.formatted!=='string')throw Error('ไม่พบผลลัพธ์จาก OpenAI');
+   if(result.formatted===original){note.textContent='OpenAI ไม่พบจุดที่จำเป็นต้องแบ่งย่อหน้าเพิ่ม ข้อความยังเหมือนเดิม';return;}
+   pending={original:original,formatted:result.formatted,start:start,end:end,segment:segment};
+   before.value=original;after.value=result.formatted;
+   document.getElementById('ai-format-breaks').textContent='เพิ่มตำแหน่งขึ้นย่อหน้า '+result.added_breaks+' แห่ง · รักษาข้อความเดิมทุกตัว';
+   dialog.showModal();
+   note.textContent='ผลจัดย่อหน้าพร้อมแล้ว กรุณาตรวจทานก่อนกดใช้';
+  }catch(error){note.textContent=error.message||'จัดย่อหน้าไม่สำเร็จ';}
+  finally{busy=false;trigger.disabled=false;}
+ };
+ api('/writer/tts-preview/status').then(function(status){
+  if(section.isConnected&&status.enabled)section.hidden=false;
+ }).catch(function(){section.hidden=true;});
+})();
+
 if(id){chapterMp3Uploader(id);revealAdminLocalVoiceStudio();revealAdminPdfExport(nid,id,function(){return chapterDirty;});}
 document.getElementById('chapterform').onsubmit=async function(e){
 e.preventDefault();

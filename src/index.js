@@ -55,6 +55,53 @@ async function api(req,env){
  if(p==='/api/me'&&m==='GET')return reply({user:await identity(db,req)});
 
  // The PDF/print view is a separate admin-only tool; no OpenAI key or TTS quota required.
+ // Admin AI manuscript formatter: model may ONLY propose additional line breaks.
+ // Exact original code units are verified before a proposed result leaves the server.
+ if(p==='/api/admin/format-text'&&m==='POST'){
+  const user=await author(db,req);
+  if(!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME||!env.OPENAI_API_KEY)failure(403,'เครื่องมือจัดต้นฉบับ AI สำหรับผู้ดูแลเท่านั้น');
+  const data=await payload(req),original=data.text;
+  if(typeof original!=='string'||original.length<1||original.length>4500||!original.trim())failure(400,'กรุณาเลือกข้อความไม่เกิน 4,500 ตัวอักษร');
+  let provider;
+  try{
+   provider=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{authorization:'Bearer '+env.OPENAI_API_KEY,'content-type':'application/json'},
+    body:JSON.stringify({
+     model:'gpt-4o-mini',
+     temperature:0,
+     max_tokens:12000,
+     response_format:{type:'json_object'},
+     messages:[
+      {role:'system',content:'You are a conservative Thai-language fiction manuscript paragraph formatter. Return only JSON object with one key "formatted" containing the full ORIGINAL text with ONLY extra newline (U+000A) characters inserted at natural Thai narrative paragraph and dialogue boundaries. Preserve ALL original characters exactly, in the same order, including original spaces, punctuation, quotation marks, and newlines. Do not delete, rewrite, normalize, translate, or fix spelling. Do not insert anything except newline. Avoid excessive paragraph breaks; only meaningful dialogue or scene shifts. If uncertain, return unchanged text. No markdown fences.'},
+      {role:'user',content:'จัดย่อหน้านิยายเฉพาะด้วยการเพิ่มบรรทัดใหม่ ห้ามแก้หรือลบอักขระเดิมแม้แต่ตัวเดียว:\n'+original}
+     ]
+    })
+   });
+  }catch(err){console.error('Manuscript formatter API connection failure');failure(502,'เชื่อมต่อ OpenAI ไม่สำเร็จ กรุณาลองใหม่');}
+  if(!provider.ok){
+   let providerCode='';
+   try{const p=await provider.json();providerCode=typeof p?.error?.code==='string'?p.error.code:'';}catch(e){}
+   console.error('Manuscript formatter provider status',provider.status);
+   if(provider.status===429&&providerCode==='insufficient_quota')failure(502,'เครดิต OpenAI API ไม่เพียงพอ');
+   if(provider.status===429)failure(502,'OpenAI จำกัดการใช้งานชั่วคราว กรุณารอสักครู่');
+   failure(502,'OpenAI จัดข้อความไม่สำเร็จ (HTTP '+provider.status+')');
+  }
+  let proposal;
+  try{
+   const result=await provider.json(),message=result?.choices?.[0]?.message?.content;
+   proposal=JSON.parse(message).formatted;
+  }catch(err){failure(502,'AI ส่งผลลัพธ์ไม่สมบูรณ์ ต้นฉบับไม่ได้เปลี่ยน');}
+  if(typeof proposal!=='string'||proposal.length>original.length+150)failure(422,'AI เปลี่ยนข้อความเดิมหรือตัดข้อความ จึงยกเลิกผลลัพธ์');
+  let cursor=0,breaks=0;
+  for(let i=0;i<proposal.length;i++){
+   if(cursor<original.length&&proposal[i]===original[cursor]){cursor++;continue;}
+   if(proposal[i]==='\n'){breaks++;continue;}
+   failure(422,'AI เปลี่ยนข้อความเดิมหรือตัดข้อความ จึงยกเลิกผลลัพธ์');
+  }
+  if(cursor!==original.length||breaks>150)failure(422,'AI เปลี่ยนข้อความเดิมหรือตัดข้อความ จึงยกเลิกผลลัพธ์');
+  return reply({formatted:proposal,added_breaks:breaks});
+ }
  if(p==='/api/admin/status'&&m==='GET'){
   const user=await identity(db,req);
   return reply({enabled:Boolean(user&&user.role==='writer'&&env.OPENAI_TTS_ADMIN_USERNAME&&user.username===env.OPENAI_TTS_ADMIN_USERNAME)});
