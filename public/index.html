@@ -112,7 +112,7 @@
 <script>
 (function(){
 'use strict';
-var app=document.getElementById('app'), user=null, current={route:'home'}, installPrompt=null, audio=null, pendingChapter=null, readsize=Number(localStorage.getItem('aksaralai.font')||19),theme=localStorage.getItem('aksaralai.theme')||'light',speed=Number(localStorage.getItem('aksaralai.speed')||1);
+var app=document.getElementById('app'), user=null, current={route:'home'}, installPrompt=null, audio=null, pendingChapter=null, pendingFormatChapterId=null, readsize=Number(localStorage.getItem('aksaralai.font')||19),theme=localStorage.getItem('aksaralai.theme')||'light',speed=Number(localStorage.getItem('aksaralai.speed')||1);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
 function toast(s){var t=document.getElementById('toast');t.textContent=s;t.classList.remove('hide');setTimeout(function(){t.classList.add('hide')},3200);}
 async function api(path,method,data){var opts={method:method||'GET',credentials:'same-origin',headers:{}};if(data!==undefined){opts.headers['content-type']='application/json';opts.body=JSON.stringify(data)}var r=await fetch('/api'+path,opts),o=await r.json();if(!r.ok){var e=new Error(o.detail||'ทำรายการไม่สำเร็จ');e.code=typeof o.code==='string'&&/^(?:LOGIN|AUTH)_[A-Z_]+$|^API_UNEXPECTED$/.test(o.code)?o.code:'';e.status=r.status;throw e;}return o;}
@@ -201,7 +201,8 @@ async function chapterMp3(chapterId,title,novelTitle){
   loading=true;document.getElementById('ai-admin-ask').disabled=true;
   status.textContent='AI กำลังตรวจข้อมูลและเตรียมคำตอบ...';
   try{
-   var result=await api('/admin/assistant','POST',{message:message});
+   var contextChapter=current.route==='edit-chapter'&&Number.isSafeInteger(Number(current.id))?Number(current.id):null;
+   var result=await api('/admin/assistant','POST',{message:message,chapter_id:contextChapter});
    if(!dialog.open)return;
    reply.textContent=result.reply||'ไม่มีคำตอบ';
    box.hidden=false;
@@ -221,7 +222,10 @@ async function chapterMp3(chapterId,title,novelTitle){
   // Only existing typed local routes; none of these actions write manuscript data.
   if(task.action==='open_studio')go('studio');
   else if(task.action==='open_novel'&&Number.isSafeInteger(task.novel_id))go('edit',task.novel_id);
-  else if(['open_chapter','format_chapter'].includes(task.action)&&Number.isSafeInteger(task.chapter_id))go('edit-chapter',task.chapter_id);
+  else if(['open_chapter','format_chapter'].includes(task.action)&&Number.isSafeInteger(task.chapter_id)){
+   if(task.action==='format_chapter')pendingFormatChapterId=task.chapter_id;
+   go('edit-chapter',task.chapter_id);
+  }
   else if(task.action==='export_pdf'&&Number.isSafeInteger(task.novel_id)){
    location.assign('/api/admin/novels/'+task.novel_id+'/manuscript'+(Number.isSafeInteger(task.chapter_id)?'?chapter='+task.chapter_id:''));
   }
@@ -267,7 +271,16 @@ async function revealAdminLocalVoiceStudio(){
  if(!section||!user||user.role!=='writer')return;
  try{
   var status=await api('/writer/tts-preview/status');
-  if(section.isConnected&&status.enabled)section.hidden=false;
+  if(section.isConnected&&status.enabled){
+   section.hidden=false;
+   // The admin already confirmed this chapter in AI Assistant. Request a
+   // separate approval for the paid formatting call, then show before/after.
+   if(id&&Number(pendingFormatChapterId)===Number(id)){
+    pendingFormatChapterId=null;
+    note.textContent='AI แอดมินเปิดเครื่องมือจัดย่อหน้าให้แล้ว ตรวจข้อความก่อนสั่ง OpenAI ได้';
+    trigger.click();
+   }
+  }
  }catch(e){if(section.isConnected)section.hidden=true;}
 }
 async function chapterMp3Uploader(chapterId){
