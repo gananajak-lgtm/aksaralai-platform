@@ -341,7 +341,7 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         // Distinguish trusted Android app from browser to invoke the native PDF print dialog.
-        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.5");
+        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.6");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -542,8 +542,24 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if(webView!=null&&webView.canGoBack())webView.goBack();
-        else super.onBackPressed();
+        if (webView == null) { super.onBackPressed(); return; }
+        if (!trustedTopLevelPage) {
+            if (webView.canGoBack()) webView.goBack();
+            else super.onBackPressed();
+            return;
+        }
+        // Aksaralai is a single-document app. WebView.canGoBack() alone cannot
+        // reliably tell which novel/chapter screen was previously visited.
+        webView.evaluateJavascript(
+            "(function(){if(typeof window.aksaralaiAndroidBack!=='function')return 'fallback';" +
+            "return window.aksaralaiAndroidBack()?'handled':'exit';})()",
+            response -> {
+                if ("\"handled\"".equals(response)) return;
+                if ("\"exit\"".equals(response)) { finish(); return; }
+                if (webView.canGoBack()) webView.goBack();
+                else finish();
+            }
+        );
     }
 
     @Override protected void onResume() {
