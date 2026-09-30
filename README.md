@@ -64,3 +64,16 @@ npm test
 **ความปลอดภัย/ค่าใช้จ่าย:** Endpoint `POST /api/writer/tts/generate` จำกัดสิทธิ์ด้วยเซสชันบัญชีนักเขียน + username ผู้ดูแลจาก Secret และตรวจ Origin, allowlist เสียง/สไตล์ และความยาวข้อความ ไม่ส่ง API Key ไปฝั่งเบราว์เซอร์ อย่างไรก็ตามรุ่นนี้ยังไม่มีเพดานงบรายวันแยกใน Worker: ต้องควบคุมเครดิต OpenAI แยกต่างหากและไม่แบ่งบัญชีผู้ดูแลให้ผู้อื่น การจำกัดจำนวนตัวอักษรต่อครั้งไม่ได้จำกัดยอดรวมที่สามารถใช้ได้ เมื่อต้องการให้ผู้อื่นใช้หรือสร้างเสียงนิยายทั้งเล่ม ควรเพิ่มคิว/การนับเครดิตและการจำกัดต้นทุนระดับเซิร์ฟเวอร์ก่อน
 
 เสียงที่ได้จาก OpenAI เป็นเสียงสร้างด้วย AI และควรแจ้งให้ผู้รับฟังทราบเมื่อเผยแพร่
+
+## อัปเดตหน้าเว็บจาก GitHub ไป Cloudflare
+
+Workflow `.github/workflows/deploy-cloudflare.yml` ใช้ GitHub Actions อัปเดต Worker และ Static Assets เมื่อ merge เข้า `main` (เฉพาะไฟล์ `src/`, `public/`, `wrangler.toml`, `package.json` หรือ workflow นี้) และสามารถกด Run workflow ด้วยตนเองได้
+
+การเชื่อมต่อครั้งแรก: เจ้าของ repo ต้องเพิ่ม **GitHub Actions repository secrets** สองค่าใน GitHub → Settings → Secrets and variables → Actions:
+
+- `CLOUDFLARE_API_TOKEN`: Token จาก Cloudflare ที่มีสิทธิ์ Workers Scripts Edit และเข้าถึงบัญชี/ทรัพยากร D1/R2 ของ `aksaralai-platform` ตามที่ Wrangler ต้องใช้ อย่าคัดลอก Token ลงในโค้ด/แชท
+- `CLOUDFLARE_ACCOUNT_ID`: Account ID จาก Cloudflare ของเจ้าของ Worker `aksaralai-platform`
+
+รัน workflow อีกครั้งจาก Actions → Deploy Aksaralai to Cloudflare Workers → Run workflow. หากไม่มี secrets งานจะขึ้น error อธิบายชื่อ secret ที่ขาดแทนการรายงานว่าส่งขึ้นเว็บสำเร็จโดยไม่จริง เมื่อสำเร็จ Workflow จะตรวจว่า `https://aksaralai-platform.gananajak.workers.dev/` มีข้อความ **รุ่นหน้าจอ 2026.09.30.3** จริง
+
+**ห้าม** ถอนติดตั้ง APK หรือล้างพื้นที่เก็บข้อมูลแอปเพื่อแก้เว็บไซต์ที่ยังไม่ Deploy เพราะอาจทำให้ข้อความแก้ไขที่ยังสำรองเฉพาะเครื่องหาย หากไม่เห็นปุ่ม “วางต้นฉบับใหม่ทั้งตอน” ทั้งบน Chrome และ APK ให้ตรวจ Actions → Deploy ... ก่อน
