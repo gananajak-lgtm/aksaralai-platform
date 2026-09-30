@@ -20,6 +20,8 @@ import android.webkit.MimeTypeMap;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.JsResult;
+import android.app.AlertDialog;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -453,6 +455,16 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                if (!trusted(url)) return false;
+                new AlertDialog.Builder(MainActivity.this)
+                    .setMessage(message)
+                    .setPositiveButton("ยืนยัน", (dialog, which) -> result.confirm())
+                    .setNegativeButton("ยกเลิก", (dialog, which) -> result.cancel())
+                    .setOnCancelListener(dialog -> result.cancel())
+                    .show();
+                return true;
+            }
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (uploadCallback != null) uploadCallback.onReceiveValue(null);
                 uploadCallback=callback;
