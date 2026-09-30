@@ -25,7 +25,7 @@ async function novel(db,nid,user){const n=await query(db,'SELECT * FROM novels W
 async function chapter(db,cid,user){const c=await query(db,'SELECT * FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');const n=await novel(db,c.novel_id,user);if(!c.published&&n.author_id!==user?.id)failure(404,'ไม่พบตอน');return {c,n,owner:n.author_id===user?.id};}
 const integer=s=>{if(!/^[1-9][0-9]*$/.test(s||''))failure(404,'ไม่พบข้อมูล');return Number(s);};
 function novelData(d){return {title:str(d,'title',1,120),summary:str(d,'summary',0,3000),genre:str(d,'genre',0,40)||'ทั่วไป',cover_color:/^#[\da-fA-F]{6}$/.test(d.cover_color||'')?d.cover_color:'#7453a8'};}
-function chapterData(d){return {title:str(d,'title',1,120),body:str(d,'body',1,300000)};}
+function chapterData(d){const title=str(d,'title',1,120),body=d?.body;if(typeof body!=='string'||body.length>300000||!body.trim())failure(400,'เนื้อหานิยายไม่ถูกต้องหรือยาวเกิน 300,000 ตัวอักษร');return {title,body};}
 function visibility(d){if(typeof d.published!=='boolean')failure(400,'สถานะเผยแพร่ไม่ถูกต้อง');return d.published?1:0;}
 async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
