@@ -26,10 +26,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest already supplies ANDROID_HOME and Android command-line tools.
       - name: Install Android SDK packages
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+        run: yes | sdkmanager --licenses >/dev/null; sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
