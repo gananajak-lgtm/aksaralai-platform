@@ -411,3 +411,17 @@ test('admin manuscript formatting UI previews without changing the manuscript un
  assert.match(html,/chapterEditor\.dispatchEvent\(new Event\('input'/);
  assert.match(html,/await api\('\/writer\/tts-preview\/status'\)/);
 });
+
+test('Android background TTS advances in native onDone without WebView JavaScript timers',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ assert.match(java,/void nativeNext\(int session\)/);
+ assert.match(java,/if\(batchSession!=session \|\| batchCursor!=pos\) return;\s*batchCursor=pos\+1;\s*nativeNext\(session\);/);
+ assert.match(java,/nativeTts\.speak\(words, TextToSpeech\.QUEUE_ADD, null, "B-" \+ session/);
+ assert.match(java,/savedBatchIndex\(String chapter, String signature\)/);
+ assert.match(java,/onPause\(\) \{\s*appForeground=false/);
+ assert.match(html,/nativeBatchMode=nativeMode&&engine\.batchAvailable/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,chapterId,signature,batchBase\)/);
+ assert.match(html,/AksaralaiNativeBatchFeedback/);
+ assert.match(html,/engine\.batchState\(\)/);
+});

@@ -41,6 +41,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Locale;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.OutputStream;
 
 public class MainActivity extends Activity {
@@ -58,6 +60,65 @@ public class MainActivity extends Activity {
     // WebView thread and must not call webView.getUrl().
     private volatile boolean trustedTopLevelPage = false;
     private final Locale thaiLocale = new Locale("th", "TH");
+    // Native queue keeps advancing from Android callbacks even when WebView JS is throttled.
+    // Batch state is written on the UI thread; volatile scalars expose progress to the bridge.
+    private List<String> batchPieces = new ArrayList<>();
+    private volatile int batchSession = 0;
+    private volatile int batchCursor = 0;
+    private volatile int batchBaseIndex = 0;
+    private volatile int batchTotal = 0;
+    private volatile String batchChapter = "";
+    private String batchSignature = "";
+    private boolean appForeground = true;
+    private String batchVoice = "";
+    private float batchSpeed = 1f;
+
+    private void reportBatch(int session, int index, String event) {
+        if (!appForeground || !trustedTopLevelPage || webView == null) return;
+        webView.evaluateJavascript("if(window.AksaralaiNativeBatchFeedback)window.AksaralaiNativeBatchFeedback(" +
+            session + "," + index + ",'" + event + "');", null);
+    }
+
+    private void clearBatch(boolean completed) {
+        if (completed && !batchChapter.isEmpty()) {
+            getSharedPreferences("aksaralai-tts", MODE_PRIVATE).edit()
+                .remove("progress." + batchChapter).apply();
+        }
+        batchPieces.clear();
+        batchSession = 0;
+        batchCursor = 0;
+        batchBaseIndex = 0;
+        batchTotal = 0;
+        batchChapter = "";
+        batchSignature = "";
+    }
+
+    private void nativeNext(int session) {
+        if (session != batchSession || !trustedTopLevelPage || nativeTtsStatus != 1 || nativeTts == null) return;
+        while (batchCursor < batchTotal) {
+            String words = batchPieces.get(batchCursor);
+            if (words == null || words.trim().isEmpty()) { batchCursor++; continue; }
+            if (!batchChapter.isEmpty()) {
+                try {
+                    JSONObject progress = new JSONObject();
+                    progress.put("signature", batchSignature);
+                    progress.put("index", batchBaseIndex + batchCursor);
+                    getSharedPreferences("aksaralai-tts", MODE_PRIVATE).edit()
+                        .putString("progress." + batchChapter, progress.toString()).apply();
+                } catch (Exception ignored) {}
+            }
+            // Native Android TTS callback drives the next chunk; no JS timers/background throttling.
+            int result = nativeTts.speak(words, TextToSpeech.QUEUE_ADD, null, "B-" + session + "-" + batchCursor);
+            if (result == TextToSpeech.ERROR) {
+                reportBatch(session, batchBaseIndex + batchCursor, "error");
+                clearBatch(false);
+            }
+            return;
+        }
+        reportBatch(session, batchBaseIndex + batchTotal, "done");
+        clearBatch(true);
+    }
+
 
     private void reportSpeech(int id, String result) {
         runOnUiThread(() -> {
@@ -69,6 +130,77 @@ public class MainActivity extends Activity {
     }
 
     private final class NativeSpeech {
+        @JavascriptInterface public String batchState() {
+            if (!trustedTopLevelPage) return "{}";
+            JSONObject state = new JSONObject();
+            try {
+                state.put("session", batchSession);
+                state.put("index", batchBaseIndex + batchCursor);
+                state.put("total", batchTotal);
+                state.put("chapter", batchChapter);
+            } catch (Exception ignored) {}
+            return state.toString();
+        }
+
+        @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
+            if (!trustedTopLevelPage || chapter == null || !chapter.matches("[0-9]{1,12}")) return 0;
+            String value = getSharedPreferences("aksaralai-tts", MODE_PRIVATE)
+                .getString("progress." + chapter, "");
+            try {
+                JSONObject record = new JSONObject(value);
+                return signature.equals(record.optString("signature")) ? Math.max(0, record.optInt("index")) : 0;
+            } catch (Exception ignored) { return 0; }
+        }
+
+        @JavascriptInterface public void speakBatch(String json, double speed, String selected,
+                                                      int session, String chapter, String signature, int startIndex) {
+            if (!trustedTopLevelPage) return;
+            if (json == null || json.length() > 600000 || session < 1 ||
+                !Double.isFinite(speed) || speed < 0.5 || speed > 2 ||
+                chapter == null || !chapter.matches("[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
+                signature == null || signature.length() > 512) return;
+            final List<String> pieces = new ArrayList<>();
+            try {
+                JSONArray arr = new JSONArray(json);
+                if (arr.length() < 1 || arr.length() > 4000) return;
+                int totalChars = 0;
+                for (int i = 0; i < arr.length(); i++) {
+                    String words = arr.getString(i);
+                    if (words.length() > 3000) return;
+                    totalChars += words.length();
+                    if (totalChars > 350000) return;
+                    pieces.add(words);
+                }
+            } catch (Exception ignored) { return; }
+            runOnUiThread(() -> {
+                if (!trustedTopLevelPage || nativeTtsStatus != 1 || nativeTts == null) {
+                    reportBatch(session, 0, "error");
+                    return;
+                }
+                nativeTts.stop();
+                clearBatch(false);
+                batchSession = session;
+                batchPieces = pieces;
+                batchCursor = 0;
+                batchBaseIndex = startIndex;
+                batchTotal = pieces.size();
+                batchChapter = chapter;
+                batchSignature = signature;
+                batchSpeed = (float) speed;
+                batchVoice = selected == null ? "" : selected;
+                if (!batchVoice.isEmpty()) {
+                    Set<Voice> available = nativeTts.getVoices();
+                    Voice chosen = null;
+                    if (available != null) for (Voice v : available)
+                        if (batchVoice.equals(v.getName()) &&
+                            "th".equals(v.getLocale().getLanguage())) {chosen = v; break;}
+                    if (chosen != null) nativeTts.setVoice(chosen);
+                    else nativeTts.setLanguage(thaiLocale);
+                } else nativeTts.setLanguage(thaiLocale);
+                nativeTts.setSpeechRate(batchSpeed);
+                nativeNext(session);
+            });
+        }
         @JavascriptInterface public int status() {
             return trustedTopLevelPage ? nativeTtsStatus : 0;
         }
@@ -93,7 +225,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void stop() {
             if (!trustedTopLevelPage) return;
-            runOnUiThread(() -> { if (nativeTts != null) nativeTts.stop(); });
+            runOnUiThread(() -> { clearBatch(false); if (nativeTts != null) nativeTts.stop(); });
         }
 
         @JavascriptInterface public void speak(String words, double speed, String selected, int id) {
@@ -105,6 +237,7 @@ public class MainActivity extends Activity {
             }
             runOnUiThread(() -> {
                 if (nativeTts == null || nativeTtsStatus != 1) { reportSpeech(id, "error"); return; }
+                clearBatch(false);
                 if (selected != null && !selected.isEmpty()) {
                     Voice chosen = null;
                     Set<Voice> all = nativeTts.getVoices();
@@ -208,7 +341,7 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         // Distinguish trusted Android app from browser to invoke the native PDF print dialog.
-        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.4");
+        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.5");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -230,12 +363,47 @@ public class MainActivity extends Activity {
             nativeTtsStatus = languageSupport == TextToSpeech.LANG_MISSING_DATA ||
                 languageSupport == TextToSpeech.LANG_NOT_SUPPORTED ? 0 : 1;
             nativeTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                @Override public void onStart(String utteranceId) {}
+                @Override public void onStart(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("B-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if (batchSession==session && batchCursor==pos)
+                                    reportBatch(session,batchBaseIndex+pos,"progress");
+                            });
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
                 @Override public void onDone(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("B-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(batchSession!=session || batchCursor!=pos) return;
+                                batchCursor=pos+1;
+                                nativeNext(session);
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
                     try { reportSpeech(Integer.parseInt(utteranceId), "done"); }
                     catch (NumberFormatException ignored) {}
                 }
                 @Override public void onError(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("B-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(batchSession!=session || batchCursor!=pos) return;
+                                reportBatch(session,batchBaseIndex+pos,"error");
+                                clearBatch(false);
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
                     try { reportSpeech(Integer.parseInt(utteranceId), "error"); }
                     catch (NumberFormatException ignored) {}
                 }
@@ -378,8 +546,20 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        appForeground=true;
+        if(webView!=null&&trustedTopLevelPage&&batchSession>0) {
+            reportBatch(batchSession,batchBaseIndex+batchCursor,"progress");
+        }
+    }
+    @Override protected void onPause() {
+        appForeground=false;
+        super.onPause();
+    }
     @Override protected void onDestroy() {
         trustedTopLevelPage = false;
+        clearBatch(false);
         if(uploadCallback!=null){uploadCallback.onReceiveValue(null);uploadCallback=null;}
         if(nativeTts!=null){nativeTts.stop();nativeTts.shutdown();nativeTts=null;}
         if(webView!=null)webView.destroy();
