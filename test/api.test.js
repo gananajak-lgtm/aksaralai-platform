@@ -224,3 +224,15 @@ test('local AI Voice Studio launcher stays hidden until admin-only TTS status pe
  assert.match(html,/chapterMp3Uploader\(id\);revealAdminLocalVoiceStudio\(\)/);
  assert.match(html,/id="voice-studio-open" hidden/);
 });
+
+test('mobile home uses compact book cards and collapsible accessible navigation',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/class="mobile-menu-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="mobile-navlinks"/);
+ assert.match(html,/class="navlinks" id="mobile-navlinks"/);
+ assert.match(html,/\.navlinks\.open\{display:flex\}/);
+ assert.match(html,/\.tile\{display:grid;grid-template-columns:88px minmax\(0,1fr\)/);
+ assert.match(html,/\.tile \.cover\{grid-column:1;grid-row:1 \/ span 5;width:88px;height:112px/);
+ assert.match(html,/\.tile>p:nth-of-type\(2\)\{grid-row:4;display:-webkit-box;-webkit-line-clamp:2/);
+ assert.match(html,/function closeMobileMenu\(\)/);
+ assert.match(html,/menuToggle\.setAttribute\('aria-expanded',String\(opening\)\)/);
+});
