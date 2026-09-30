@@ -263,3 +263,52 @@ test('mobile long-chapter editor uses bounded editable segments and local draft 
  assert.match(html,/confirm\('พบข้อความแก้ไขที่ยังไม่ได้บันทึก/);
  assert.doesNotMatch(html,/<textarea name="body" required style="min-height:370px" maxlength="300000">\'\+esc\(chapter\?\.body/);
 });
+
+test('manuscript print export is admin-only, retains Thai manuscript and escapes HTML',async()=>{
+ const h=harness({OPENAI_TTS_ADMIN_USERNAME:'pdf_owner'});
+ assert.equal((await h.api('/register','POST',{username:'pdf_owner',display_name:'เจ้าของงาน',password:'long-password-pdf',role:'writer'})).status,201);
+ const ownerCookie=h.getCookie();
+ const book=await h.api('/writer/novels','POST',{title:'พยัคฆ์ & <เขา>',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const text1='  คำนำ\nย่อหน้าหนึ่ง <script>alert(1)</script> & ตัวอักษรไทย\n\nจบ   ';
+ const one=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'ตอนแรก <ทดสอบ>',body:text1});
+ const two=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'ตอนสอง',body:'เนื้อหาตอนสอง'});
+ assert.equal(one.status,201);assert.equal(two.status,201);
+ assert.equal((await h.api('/admin/status')).enabled,true);
+ async function manuscript(path,cookie){
+  return worker.fetch(new Request('https://example.com/api'+path,{headers:{cookie:cookie||''}}),h.env);
+ }
+ let response=await manuscript('/admin/novels/'+book.id+'/manuscript',ownerCookie);
+ assert.equal(response.status,200);
+ assert.match(response.headers.get('content-type'),/text\/html/);
+ assert.match(response.headers.get('cache-control'),/no-store/);
+ const pdfHtml=await response.text();
+ assert.ok(pdfHtml.includes('คำนำ\nย่อหน้าหนึ่ง'));
+ assert.ok(pdfHtml.includes('ตอนสอง'));
+ assert.ok(pdfHtml.includes('พยัคฆ์ &amp; &lt;เขา&gt;'));
+ assert.ok(pdfHtml.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+ assert.equal(pdfHtml.includes('<script>alert(1)</script>'),false);
+ assert.match(pdfHtml,/@page\{size:A4/);
+ response=await manuscript('/admin/novels/'+book.id+'/manuscript?chapter='+one.id,ownerCookie);
+ assert.equal(response.status,200);
+ const oneHtml=await response.text();
+ assert.ok(oneHtml.includes('ตอนแรก'));
+ assert.equal(oneHtml.includes('เนื้อหาตอนสอง'),false);
+ assert.equal((await manuscript('/admin/novels/'+book.id+'/manuscript?chapter=999999',ownerCookie)).status,404);
+ h.clear();
+ assert.equal((await h.api('/admin/status')).enabled,false);
+ assert.equal((await manuscript('/admin/novels/'+book.id+'/manuscript','')).status,401);
+ assert.equal((await h.api('/register','POST',{username:'otherpdf',display_name:'นักเขียนอื่น',password:'long-password-pdf2',role:'writer'})).status,201);
+ assert.equal((await h.api('/admin/status')).enabled,false);
+ assert.equal((await manuscript('/admin/novels/'+book.id+'/manuscript',h.getCookie())).status,403);
+ h.clear();
+ assert.equal((await h.api('/register','POST',{username:'readerpdf',display_name:'นักอ่าน',password:'long-password-pdf3',role:'reader'})).status,201);
+ assert.equal((await manuscript('/admin/novels/'+book.id+'/manuscript',h.getCookie())).status,403);
+});
+test('admin PDF buttons are hidden until privileged status confirms admin',()=>{
+ const page=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(page,/id="export-novel-pdf" hidden/);
+ assert.match(page,/id="export-chapter-pdf" hidden/);
+ assert.match(page,/await api\('\/admin\/status'\)/);
+ assert.match(page,/if\(!button\.isConnected\|\|!permission\.enabled\)return/);
+ assert.match(page,/revealAdminPdfExport\(nid,id,function\(\)\{return chapterDirty;\}\)/);
+});
