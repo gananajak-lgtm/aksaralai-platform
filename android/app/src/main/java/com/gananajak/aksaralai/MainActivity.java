@@ -130,8 +130,14 @@ public class MainActivity extends Activity {
     private final class NativeSpeech {
         @JavascriptInterface public String batchState() {
             if (!trustedTopLevelPage) return "{}";
-            return "{\\"session\\":" + batchSession + ",\\"index\\":" + batchCursor +
-                ",\\"total\\":" + batchTotal + ",\\"chapter\\":\\"" + batchChapter + "\\"}";
+            JSONObject state = new JSONObject();
+            try {
+                state.put("session", batchSession);
+                state.put("index", batchCursor);
+                state.put("total", batchTotal);
+                state.put("chapter", batchChapter);
+            } catch (Exception ignored) {}
+            return state.toString();
         }
 
         @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
