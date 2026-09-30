@@ -54,11 +54,14 @@ public class MainActivity extends Activity {
     private TextToSpeech nativeTts;
     // -1 initializing, 0 unavailable for Thai, 1 ready.
     private volatile int nativeTtsStatus = -1;
+    // Only the UI thread updates this. JavaScript bridge methods run on a separate
+    // WebView thread and must not call webView.getUrl().
+    private volatile boolean trustedTopLevelPage = false;
     private final Locale thaiLocale = new Locale("th", "TH");
 
     private void reportSpeech(int id, String result) {
         runOnUiThread(() -> {
-            if (webView != null && trusted(webView.getUrl())) {
+            if (webView != null && trustedTopLevelPage) {
                 webView.evaluateJavascript("if(window.AksaralaiNativeSpeechFeedback)window.AksaralaiNativeSpeechFeedback(" +
                     id + ",'" + result + "');", null);
             }
@@ -67,11 +70,11 @@ public class MainActivity extends Activity {
 
     private final class NativeSpeech {
         @JavascriptInterface public int status() {
-            return trusted(webView.getUrl()) ? nativeTtsStatus : 0;
+            return trustedTopLevelPage ? nativeTtsStatus : 0;
         }
 
         @JavascriptInterface public String voices() {
-            if (!trusted(webView.getUrl()) || nativeTtsStatus != 1 || nativeTts == null) return "[]";
+            if (!trustedTopLevelPage || nativeTtsStatus != 1 || nativeTts == null) return "[]";
             JSONArray list = new JSONArray();
             Set<Voice> all = nativeTts.getVoices();
             if (all == null) return "[]";
@@ -89,12 +92,12 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface public void stop() {
-            if (!trusted(webView.getUrl())) return;
+            if (!trustedTopLevelPage) return;
             runOnUiThread(() -> { if (nativeTts != null) nativeTts.stop(); });
         }
 
         @JavascriptInterface public void speak(String words, double speed, String selected, int id) {
-            if (!trusted(webView.getUrl())) return;
+            if (!trustedTopLevelPage) return;
             if (words == null || words.isEmpty() || words.length() > 3000 ||
                 !Double.isFinite(speed) || speed < 0.5 || speed > 2.0 || id < 1) {
                 reportSpeech(id, "error");
@@ -205,7 +208,7 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         // Distinguish trusted Android app from browser to invoke the native PDF print dialog.
-        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.3");
+        settings.setUserAgentString(settings.getUserAgentString() + " AksaralaiAndroid/0.1.4");
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -239,6 +242,9 @@ public class MainActivity extends Activity {
             });
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                trustedTopLevelPage = false;
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 if ("aksaralai-print".equalsIgnoreCase(request.getUrl().getScheme())) {
@@ -263,7 +269,8 @@ public class MainActivity extends Activity {
                 return true;
             }
             @Override public void onPageFinished(WebView view, String url) {
-                if (!trusted(url)) return;
+                trustedTopLevelPage = trusted(url);
+                if (!trustedTopLevelPage) return;
                 // The OpenAI studio returns a blob: MP3. Hand it to Android Downloads.
                 // Only the trusted top-level app document receives this click listener.
                 String hook = "(function(){if(window.__aksaralaiApkSave)return;window.__aksaralaiApkSave=true;" +
@@ -372,6 +379,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        trustedTopLevelPage = false;
         if(uploadCallback!=null){uploadCallback.onReceiveValue(null);uploadCallback=null;}
         if(nativeTts!=null){nativeTts.stop();nativeTts.shutdown();nativeTts=null;}
         if(webView!=null)webView.destroy();
