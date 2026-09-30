@@ -99,12 +99,12 @@ test('preview diagnostics only reveal presence and username match, never secret 
  const h=harness({OPENAI_API_KEY:'should-never-leak',OPENAI_TTS_ADMIN_USERNAME:'wrong-user'});
  assert.equal((await h.api('/register','POST',{username:'gananajak',display_name:'Owner',password:'long-password-03',role:'writer'})).status,201);
  const result=await h.api('/writer/tts-preview/status');
- assert.deepEqual(result,{status:200,enabled:false,checks:{api_key_present:true,admin_username_present:true,username_matches:false}});
+ assert.deepEqual(result,{status:200,enabled:false});
  assert.equal(JSON.stringify(result).includes('should-never-leak'),false);
  assert.equal(JSON.stringify(result).includes('wrong-user'),false);
  const disabled=harness();
  assert.equal((await disabled.api('/register','POST',{username:'writer99',display_name:'Writer',password:'long-password-04',role:'writer'})).status,201);
- assert.deepEqual((await disabled.api('/writer/tts-preview/status')).checks,{api_key_present:false,admin_username_present:false,username_matches:false});
+ assert.deepEqual(await disabled.api('/writer/tts-preview/status'),{status:200,enabled:false});
 });
 test('OpenAI preview is disabled by default and reserved for configured owner with three daily attempts',async()=>{
  const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'adminwriter'});
