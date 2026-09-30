@@ -664,7 +664,7 @@ chapterEditor.addEventListener('input',function(){
   chapterLength+=chapterEditor.value.length-old;
  }else{
   chapterLength=chapterEditor.value.length;
-  if(chapterLength>12000&&window.matchMedia('(max-width:640px)').matches){
+  if(!wholeEditMode&&chapterLength>12000&&window.matchMedia('(max-width:640px)').matches){
    var offset=chapterEditor.selectionStart;
    var whole=chapterEditor.value;
    setChapterText(whole);
