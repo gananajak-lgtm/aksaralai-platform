@@ -73,8 +73,8 @@
  .novel-detail .chapter-item .btn{flex-shrink:0;font-size:13px}
 }
 .ai-format-area{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.ai-format-area .small{margin:6px 0 0}.ai-format-dialog{width:min(94vw,850px);max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:17px;background:var(--paper);color:var(--ink);padding:clamp(14px,3vw,25px)}.ai-format-dialog::backdrop{background:#191021a8}.ai-format-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ai-format-compare textarea{width:100%;min-height:220px;max-height:42dvh;white-space:pre-wrap;font-size:14px;line-height:1.6}.ai-format-dialog h2{font-size:19px;margin-top:0}@media(max-width:640px){.ai-format-compare{grid-template-columns:minmax(0,1fr)}.ai-format-compare textarea{min-height:135px;max-height:27dvh}}
-</style></head>
-<body><header class="top"><div class="shell nav"><div class="brand">✦ <i>อักษราลัย</i></div><button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="mobile-navlinks">☰ เมนู</button><div class="navlinks" id="mobile-navlinks"><button data-go="home">สำรวจนิยาย</button><button data-go="shelf">ชั้นหนังสือ</button><button data-go="studio" id="writer-nav" hidden>สตูดิโอนักเขียน</button><button type="button" id="voice-studio-open" hidden>🎙️ ใช้ OpenAI</button></div><div class="right"><button id="install" hidden>⬇ ติดตั้ง</button><span class="small" id="account"></span><button data-go="auth" id="authnav">เข้าสู่ระบบ</button></div></div></header>
+.ai-admin-dialog{border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);width:min(94vw,700px);max-height:90dvh;overflow:auto;padding:0}.ai-admin-dialog::backdrop{background:#261d32af}.ai-admin-inner{padding:clamp(16px,4vw,28px)}.ai-admin-inner h2{margin:0;font-size:22px}.ai-admin-inner textarea{min-height:120px}.ai-admin-inner .panel{margin-top:14px}.ai-admin-inner .controls{gap:8px}.ai-admin-inner .btn{max-width:100%}</style></head>
+<body><header class="top"><div class="shell nav"><div class="brand">✦ <i>อักษราลัย</i></div><button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="mobile-navlinks">☰ เมนู</button><div class="navlinks" id="mobile-navlinks"><button data-go="home">สำรวจนิยาย</button><button data-go="shelf">ชั้นหนังสือ</button><button data-go="studio" id="writer-nav" hidden>สตูดิโอนักเขียน</button><button type="button" id="voice-studio-open" hidden>🎙️ ใช้ OpenAI</button><button type="button" id="ai-admin-open" hidden>🤖 AI แอดมิน</button></div><div class="right"><button id="install" hidden>⬇ ติดตั้ง</button><span class="small" id="account"></span><button data-go="auth" id="authnav">เข้าสู่ระบบ</button></div></div></header>
 <main class="shell layout" id="app" aria-live="polite"></main><footer class="footer">อักษราลัย • แพลตฟอร์มอ่าน เขียน และฟังนิยาย · เวอร์ชันทดลอง</footer><div class="toast hide" id="toast" role="status"></div><dialog class="voice-studio-dialog" id="voice-studio-modal" aria-labelledby="voice-studio-title">
  <div class="voice-studio-inner">
  <div class="dialog-heading"><h2 id="voice-studio-title">🎙️ สร้างเสียง MP3 ด้วย OpenAI</h2><button class="btn ghost" type="button" id="voice-studio-close" aria-label="ปิดหน้าต่าง">✕</button></div>
@@ -95,6 +95,20 @@
  <div class="voice-studio-output" data-tts-output hidden><strong>🎧 ฟังตัวอย่าง MP3</strong><audio controls id="voice-studio-player"></audio><p><a class="btn" data-tts-download hidden download="aksaralai-openai.mp3">⬇ ดาวน์โหลด MP3 ลงเครื่อง</a></p><p class="small">ไฟล์ดาวน์โหลดไม่ถูกอัปโหลดเข้าอักษราลัยอัตโนมัติ สามารถนำไฟล์ไปใช้งานอื่นหรืออัปโหลดที่หน้าจัดการตอนนิยายภายหลังได้</p></div>
  </div>
 </dialog>
+<dialog class="ai-admin-dialog" id="ai-admin-dialog" aria-labelledby="ai-admin-title">
+  <div class="ai-admin-inner">
+   <div class="row between"><h2 id="ai-admin-title">🤖 ผู้ช่วยแอดมินอักษราลัย</h2><button class="btn ghost" type="button" id="ai-admin-close">✕ ปิด</button></div>
+   <p class="small">ระดับ 2 · ให้ AI ตรวจรายการนิยายและเสนอขั้นตอน จากนั้นคุณต้องกดยืนยันก่อนเปิดหน้าดำเนินการ · ไม่มีสิทธิ์ลบ แก้ไข หรือเผยแพร่เอง</p>
+   <form id="ai-admin-form">
+    <label for="ai-admin-prompt">สั่งงานเป็นภาษาไทย</label>
+    <textarea id="ai-admin-prompt" maxlength="1000" required placeholder="เช่น ช่วยหาเงาซ่อนพยัคฆ์ตอนที่ 8 แล้วพาฉันไปหน้าแก้ไข / เปิดหน้าส่งออก PDF เรื่องนี้"></textarea>
+    <p class="small">AI จะเห็นเฉพาะรายชื่อเรื่องและข้อมูลตอนของบัญชีแอดมิน ไม่ได้อ่านเนื้อหาทั้งตอนหรือสถานะเสียงจริง · มีค่าเครดิต OpenAI API ตามการใช้งาน</p>
+    <button class="btn" id="ai-admin-ask" type="submit">ถาม AI</button>
+   </form>
+   <p class="small" role="status" id="ai-admin-status"></p>
+   <section class="panel" id="ai-admin-response" hidden><h3>คำตอบจาก AI</h3><p id="ai-admin-reply" style="white-space:pre-wrap"></p><div id="ai-admin-proposal" hidden><p class="small">AI เสนอการดำเนินการนี้ แต่ยังไม่ได้ทำอะไร</p><div class="controls"><button type="button" class="btn" id="ai-admin-confirm">ยืนยันและเปิดหน้าดำเนินการ</button><button type="button" class="btn ghost" id="ai-admin-reject">ไม่ดำเนินการ</button></div></div></section>
+  </div>
+</dialog>
 <script>
 (function(){
 'use strict';
@@ -109,7 +123,7 @@ async function go(route,id){if(route==='read'&&!user){pendingChapter=id;route='a
 function card(n){return '<article class="tile"><div class="cover" style="--cover:'+esc(n.cover_color||'#7751a4')+'">📖</div><span class="chip">'+esc(n.genre||'ทั่วไป')+'</span><h3>'+esc(n.title)+'</h3><p>'+esc(n.author||'')+'</p><p>'+esc((n.summary||'').slice(0,85))+'</p><div class="bottom"><span class="small">'+esc(n.chapter_count||0)+' ตอน</span><button class="btn" data-go="novel" data-id="'+n.id+'">อ่านเรื่องนี้</button></div></article>';}
 async function home(){var novels=(await api('/novels')).novels;var last=null;try{last=JSON.parse(localStorage.getItem('aksaralai.tts.last')||'null');}catch(e){}var lastButton=last&&/^[1-9][0-9]*$/.test(last.chapterId)?'<p><button class="btn" data-go="read" data-id="'+last.chapterId+'">🎧 กลับไปฟังตอนล่าสุด</button></p>':'';app.innerHTML='<section class="hero"><span>📚 ยินดีต้อนรับสู่โลกแห่งเรื่องเล่า</span><h1>ทุกเรื่องราวเริ่มต้นที่นี่</h1><p>ค้นพบนิยายเรื่องใหม่ สร้างผลงานของคุณ และเลือกอ่านหรือฟังได้ตามใจ</p>'+lastButton+'</section><div class="toolbar"><h2>สำรวจนิยาย</h2><form id="search" class="search"><input name="q" placeholder="ค้นหานิยายหรือผู้เขียน" aria-label="ค้นหา"><button class="btn">ค้นหา</button></form></div><section id="listing" class="grid"></section>';document.getElementById('listing').innerHTML=novels.length?novels.map(card).join(''):'<p class="empty">ยังไม่มีนิยายที่เผยแพร่ ลองสมัครเป็นนักเขียนและลงเรื่องแรกได้เลย ✍️</p>';document.getElementById('search').onsubmit=async function(e){e.preventDefault();var q=new FormData(e.target).get('q'),o=await call(function(){return api('/novels?q='+encodeURIComponent(q))});if(o)document.getElementById('listing').innerHTML=o.novels.length?o.novels.map(card).join(''):'<p class="empty">ไม่พบเรื่องที่ค้นหา</p>';};}
 function auth(){app.innerHTML='<section class="panel" style="max-width:600px;margin:28px auto"><h1>ยินดีต้อนรับสู่อักษราลัย</h1><p class="small">สมัครเป็นนักอ่านหรือนักเขียนได้ด้วยชื่อผู้ใช้และรหัสผ่าน</p><form id="login-form"><h2>เข้าสู่ระบบ</h2><label>ชื่อผู้ใช้</label><input name="username" autocomplete="username" required><label>รหัสผ่าน</label><input name="password" type="password" autocomplete="current-password" required><p><button class="btn">เข้าสู่ระบบ</button></p><div id="login-error" class="notice" role="alert" hidden></div></form><hr style="border:0;border-top:1px solid var(--line);margin:25px 0"><form id="register-form"><h2>สมัครสมาชิก</h2><label>ชื่อผู้ใช้ภาษาอังกฤษ (3–24 ตัว)</label><input name="username" pattern="[a-zA-Z0-9_]{3,24}" required autocomplete="username"><label>ชื่อแสดง</label><input name="display_name" required maxlength="50"><label>รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)</label><input name="password" type="password" minlength="8" required autocomplete="new-password"><label>ประเภทบัญชี</label><select name="role"><option value="reader">นักอ่าน</option><option value="writer">นักเขียน</option></select><p><button class="btn">สมัครสมาชิก</button></p><div id="register-error" class="notice" role="alert" hidden></div></form></section>';['login','register'].forEach(function(type){document.getElementById(type+'-form').onsubmit=async function(e){e.preventDefault();var d=Object.fromEntries(new FormData(e.target));var errorBox=document.getElementById(type+'-error');errorBox.hidden=true;errorBox.textContent='';var submit=e.target.querySelector('button[type="submit"],button:not([type])');if(submit)submit.disabled=true;try{await api('/'+type,'POST',d);await refresh();var target=pendingChapter;pendingChapter=null;go(target?'read':'home',target||undefined);}catch(err){var code=err.code?' ['+err.code+']':'';var status=err.status?' (HTTP '+err.status+')':'';errorBox.textContent=(err.message||'ทำรายการไม่สำเร็จ')+code+status;errorBox.hidden=false;errorBox.scrollIntoView({block:'nearest',behavior:'smooth'});}finally{if(submit)submit.disabled=false;}};});}
-async function refresh(){var res=await api('/me');user=res.user;updateNav();var open=document.getElementById('voice-studio-open');open.hidden=true;if(user&&user.role==='writer'){try{var tts=await api('/writer/tts-preview/status');open.hidden=!tts.enabled;}catch(e){open.hidden=true;}}}
+async function refresh(){var res=await api('/me');user=res.user;updateNav();var open=document.getElementById('voice-studio-open'),assistant=document.getElementById('ai-admin-open');open.hidden=true;assistant.hidden=true;if(user&&user.role==='writer'){try{var tts=await api('/writer/tts-preview/status');open.hidden=!tts.enabled;assistant.hidden=!tts.enabled;}catch(e){open.hidden=true;assistant.hidden=true;}}}
 async function shelf(){if(!user){app.innerHTML='<div class="empty">กรุณาเข้าสู่ระบบก่อนเปิดชั้นหนังสือ <button class="btn" data-go="auth">เข้าสู่ระบบ</button></div>';return;}var o=await api('/shelf');app.innerHTML='<div class="toolbar"><h1>ชั้นหนังสือของฉัน</h1></div><div class="grid">'+(o.novels.length?o.novels.map(card).join(''):'<div class="empty">ยังไม่มีเรื่องในชั้นหนังสือ</div>')+'</div>';}
 async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerHTML='<div class="panel novel-detail"><div class="novel-overview"><div class="cover novel-cover" style="--cover:'+esc(n.cover_color)+'">📖</div><div class="novel-info"><span class="chip">'+esc(n.genre)+'</span><h1>'+esc(n.title)+'</h1><p class="novel-author">เขียนโดย '+esc(o.author)+'</p></div><p class="novel-summary">'+esc(n.summary)+'</p><div class="controls novel-actions"><button class="btn" id="begin">เริ่มอ่าน</button><button class="btn subtle" id="save">'+(o.saved?'✓ อยู่ในชั้นหนังสือ':'＋ เพิ่มเข้าชั้นหนังสือ')+'</button>'+(o.is_owner?'<button class="btn ghost" data-go="edit" data-id="'+n.id+'">จัดการเรื่อง</button>':'')+'</div></div><h2>สารบัญ · '+o.chapters.length+' ตอน</h2><div class="chapter-list">'+(o.chapters.length?o.chapters.map(function(c){return '<div class="chapter-item"><span>'+esc(c.position)+'. '+esc(c.title)+(c.published?'':' · ฉบับร่าง')+'</span><button class="btn subtle" data-go="read" data-id="'+c.id+'">อ่าน</button></div>'}).join(''):'<p class="empty">ยังไม่มีตอนให้อ่าน</p>')+'</div></div>';document.getElementById('begin').onclick=function(){if(o.chapters.length)go('read',o.progress?.chapter_id||o.chapters[0].id);else toast('ยังไม่มีตอนให้อ่าน');};document.getElementById('save').onclick=async function(){if(!user){go('auth');return;}var r=await call(function(){return api('/novels/'+id+'/shelf','POST',{})});if(r)go('novel',id);};}
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
@@ -168,6 +182,51 @@ async function chapterMp3(chapterId,title,novelTitle){
   }};
  }catch(e){if(section.isConnected)section.hidden=true;}
 }
+// Level-2 admin assistant: the server sends only an allowlisted, ownership-checked
+// proposal; the browser never executes a model-generated URL or mutating command.
+(function installAdminAssistant(){
+ var launcher=document.getElementById('ai-admin-open'),dialog=document.getElementById('ai-admin-dialog');
+ var form=document.getElementById('ai-admin-form'),status=document.getElementById('ai-admin-status');
+ var box=document.getElementById('ai-admin-response'),reply=document.getElementById('ai-admin-reply');
+ var proposalSection=document.getElementById('ai-admin-proposal'),confirm=document.getElementById('ai-admin-confirm');
+ var pending=null,loading=false;
+ launcher.onclick=function(){if(!launcher.hidden)dialog.showModal();};
+ document.getElementById('ai-admin-close').onclick=function(){dialog.close();};
+ document.getElementById('ai-admin-reject').onclick=function(){pending=null;proposalSection.hidden=true;status.textContent='ยกเลิกการดำเนินการแล้ว ไม่มีการเปลี่ยนแปลงข้อมูล';};
+ form.onsubmit=async function(e){
+  e.preventDefault();if(loading)return;
+  pending=null;proposalSection.hidden=true;box.hidden=true;
+  var message=document.getElementById('ai-admin-prompt').value.trim();
+  if(!message){status.textContent='กรุณาพิมพ์คำสั่ง';return;}
+  loading=true;document.getElementById('ai-admin-ask').disabled=true;
+  status.textContent='AI กำลังตรวจข้อมูลและเตรียมคำตอบ...';
+  try{
+   var result=await api('/admin/assistant','POST',{message:message});
+   if(!dialog.open)return;
+   reply.textContent=result.reply||'ไม่มีคำตอบ';
+   box.hidden=false;
+   var proposal=result.proposal;
+   if(proposal&&['open_studio','open_novel','open_chapter','format_chapter','export_pdf'].includes(proposal.action)){
+    pending=proposal;
+    confirm.textContent='ยืนยัน: '+proposal.label;
+    proposalSection.hidden=false;
+    status.textContent='AI เสนอขั้นตอนให้ตรวจสอบ ยังไม่มีการแก้ไขข้อมูล';
+   }else status.textContent='AI ตอบคำถามแล้ว ไม่มีการดำเนินการเพิ่มเติม';
+  }catch(err){status.textContent=err.message||'เชื่อมต่อ AI ไม่สำเร็จ';}
+  finally{loading=false;document.getElementById('ai-admin-ask').disabled=false;}
+ };
+ confirm.onclick=function(){
+  if(!pending)return;
+  var task=pending;pending=null;proposalSection.hidden=true;dialog.close();
+  // Only existing typed local routes; none of these actions write manuscript data.
+  if(task.action==='open_studio')go('studio');
+  else if(task.action==='open_novel'&&Number.isSafeInteger(task.novel_id))go('edit',task.novel_id);
+  else if(['open_chapter','format_chapter'].includes(task.action)&&Number.isSafeInteger(task.chapter_id))go('edit-chapter',task.chapter_id);
+  else if(task.action==='export_pdf'&&Number.isSafeInteger(task.novel_id)){
+   location.assign('/api/admin/novels/'+task.novel_id+'/manuscript'+(Number.isSafeInteger(task.chapter_id)?'?chapter='+task.chapter_id:''));
+  }
+ };
+})();
 // Standalone owner-only MP3 creation. Existing chapter upload flow remains independent.
 var voiceStudioModal=document.getElementById('voice-studio-modal');
 var voiceStudioUrl=null;
