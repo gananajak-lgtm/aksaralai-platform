@@ -342,3 +342,14 @@ test('Android APK uses native Thai TTS bridge, not unsupported WebView speechSyn
  assert.match(java,/nativeTts\.shutdown\(\)/);
  assert.match(manifest,/android\.intent\.action\.TTS_SERVICE/);
 });
+
+test('native Android TTS bridge does not access WebView from JavaScript interface thread',()=>{
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ const nativeSpeech=java.slice(java.indexOf('private final class NativeSpeech'),java.indexOf('@SuppressLint("SetJavaScriptEnabled")'));
+ assert.ok(nativeSpeech.includes('trustedTopLevelPage'));
+ assert.doesNotMatch(nativeSpeech,/webView\.getUrl\(\)/);
+ assert.match(java,/private volatile boolean trustedTopLevelPage = false/);
+ assert.match(java,/onPageStarted\(WebView view, String url, android\.graphics\.Bitmap favicon\)/);
+ assert.match(java,/onPageFinished\(WebView view, String url\) \{\s*trustedTopLevelPage = trusted\(url\)/);
+ assert.match(java,/return trustedTopLevelPage \? nativeTtsStatus : 0/);
+});
