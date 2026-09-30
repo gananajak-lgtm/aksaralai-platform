@@ -73,7 +73,7 @@ async function api(req,env){
      max_tokens:12000,
      response_format:{type:'json_object'},
      messages:[
-      {role:'system',content:'You are a conservative Thai-language fiction manuscript paragraph formatter. Return only JSON object with one key "formatted" containing the full ORIGINAL text with ONLY extra newline (U+000A) characters inserted at natural Thai narrative paragraph and dialogue boundaries. Preserve ALL original characters exactly, in the same order, including original spaces, punctuation, quotation marks, and newlines. Do not delete, rewrite, normalize, translate, or fix spelling. Do not insert anything except newline. Avoid excessive paragraph breaks; only meaningful dialogue or scene shifts. If uncertain, return unchanged text. No markdown fences.'},
+      {role:'system',content:'You are a conservative Thai-language fiction manuscript paragraph formatter. Return only JSON object with one key "formatted" containing the full ORIGINAL text with ONLY extra newline (U+000A) characters inserted at natural Thai narrative paragraph and dialogue boundaries. Preserve ALL original characters exactly, in the same order, including original spaces, punctuation, quotation marks, and newlines. Do not delete, rewrite, normalize, translate, or fix spelling. Do not insert anything except a SINGLE newline at each meaningful paragraph boundary. NEVER insert an empty paragraph or a blank line between paragraphs, and never introduce two consecutive line breaks. Avoid excessive paragraph breaks; only meaningful dialogue or scene shifts. If uncertain, return unchanged text. No markdown fences.'},
       {role:'user',content:'จัดย่อหน้านิยายเฉพาะด้วยการเพิ่มบรรทัดใหม่ ห้ามแก้หรือลบอักขระเดิมแม้แต่ตัวเดียว:\n'+original}
      ]
     })
@@ -96,7 +96,11 @@ async function api(req,env){
   let cursor=0,breaks=0;
   for(let i=0;i<proposal.length;i++){
    if(cursor<original.length&&proposal[i]===original[cursor]){cursor++;continue;}
-   if(proposal[i]==='\n'){breaks++;continue;}
+   if(proposal[i]==='\n'){
+    // Preserve the manuscript's existing line breaks but never introduce an empty line.
+    if(i===0||i===proposal.length-1||proposal[i-1]==='\n'||proposal[i+1]==='\n'||proposal[i+1]==='\r')failure(422,'AI เพิ่มบรรทัดว่างเกินมา จึงยกเลิกผลลัพธ์');
+    breaks++;continue;
+   }
    failure(422,'AI เปลี่ยนข้อความเดิมหรือตัดข้อความ จึงยกเลิกผลลัพธ์');
   }
   if(cursor!==original.length||breaks>150)failure(422,'AI เปลี่ยนข้อความเดิมหรือตัดข้อความ จึงยกเลิกผลลัพธ์');
@@ -155,7 +159,9 @@ async function api(req,env){
   // The action label is server-authored, never model-supplied.
   const labels={none:'',open_studio:'เปิดสตูดิโอนักเขียน',open_novel:'เปิดหน้าจัดการนิยาย',open_chapter:'เปิดหน้าแก้ไขตอน',format_chapter:'เปิดหน้าแก้ไขตอนเพื่อใช้ AI จัดย่อหน้า',export_pdf:'เปิดหน้าส่งออก PDF'};
   const proposal=action==='none'?null:{action,label:labels[action],novel_id:action==='open_novel'||action==='export_pdf'?novelId:((action==='format_chapter'?targetChapter:chapter)?.novel_id||null),chapter_id:action==='format_chapter'?targetChapter.id:action==='open_chapter'?chapterId:action==='export_pdf'&&chapter?chapterId:null};
-  return reply({reply:result.reply.slice(0,1100),proposal});
+  // A model's free-form explanation must not contradict the validated action.
+  const answer=action==='format_chapter'?'เปิดเครื่องมือจัดย่อหน้าในหน้าแก้ไขตอน “'+targetChapter.title+'” ให้ได้ หลังจากคุณยืนยัน ระบบจะเสนอการขึ้นบรรทัดใหม่โดยไม่เพิ่มบรรทัดว่าง ไม่แก้ตัวอักษรเดิม และจะแสดงผลก่อน–หลังให้ตรวจอีกครั้งก่อนบันทึก':result.reply.slice(0,1100);
+  return reply({reply:answer,proposal});
  }
  if(p==='/api/admin/status'&&m==='GET'){
   const user=await identity(db,req);
