@@ -539,3 +539,79 @@ test('confirmed admin formatter action opens the selected editor and the existin
  assert.match(html,/id="ai-format-before"/);
  assert.match(html,/id="ai-format-after"/);
 });
+
+test('admin can download DOCX and TXT without OpenAI, including unpublished Thai manuscripts',async()=>{
+ const h=harness({OPENAI_TTS_ADMIN_USERNAME:'exportowner'});
+ assert.equal((await h.api('/register','POST',{username:'exportowner',display_name:'Owner',password:'long-password-export1',role:'writer'})).status,201);
+ const owner=h.getCookie();
+ const n=await h.api('/writer/novels','POST',{title:'เงาซ่อนพยัคฆ์',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const text='  บรรทัดแรก  \n\nบทสนทนา "สวัสดี" และ & < >\nบรรทัดท้าย ';
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนที่ ๑',body:text});
+ async function download(format,cookie=owner,novelId=n.id,chapterId=null){
+  const url='https://example.com/api/admin/novels/'+novelId+'/manuscript?format='+format+(chapterId?'&chapter='+chapterId:'');
+  return worker.fetch(new Request(url,{headers:cookie?{cookie}:{}}),h.env);
+ }
+ const doc=await download('docx');assert.equal(doc.status,200);
+ assert.match(doc.headers.get('content-type'),/wordprocessingml/);
+ assert.match(doc.headers.get('content-disposition'),/attachment/);
+ const bytes=new Uint8Array(await doc.arrayBuffer());
+ assert.equal(String.fromCharCode(...bytes.slice(0,4)),'PK\x03\x04');
+ const decoded=new TextDecoder().decode(bytes);
+ assert.match(decoded,/word\/document.xml/);
+ assert.match(decoded,/เงาซ่อนพยัคฆ์/);
+ assert.match(decoded,/บทสนทนา &quot;สวัสดี&quot; และ &amp; &lt; &gt;/);
+ assert.match(decoded,/w:pgSz w:w="11906" w:h="16838"/);
+ assert.match(decoded,/xml:space="preserve">  บรรทัดแรก  /);
+ const txt=await download('txt',owner,n.id,c.id);
+ assert.equal(txt.status,200);
+ assert.match(txt.headers.get('content-type'),/text\/plain/);
+ assert.equal(await txt.text(),'เงาซ่อนพยัคฆ์ — ตอนที่ ๑\n\n1. ตอนที่ ๑\n'+text);
+ assert.equal((await download('xlsx')).status,400);
+ assert.equal((await download('docx','')).status,401);
+ assert.equal((await download('txt','',n.id,c.id)).status,401);
+ h.clear();
+ assert.equal((await h.api('/register','POST',{username:'not_exportowner',display_name:'Other',password:'long-password-export2',role:'writer'})).status,201);
+ const otherCookie=h.getCookie();
+ assert.equal((await download('docx',otherCookie)).status,403);
+ h.setCookie(owner);
+ const notOwned=await h.api('/writer/novels','POST',{title:'อีกเรื่อง',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ assert.equal((await download('docx',owner,notOwned.id,c.id)).status,404);
+});
+
+test('DOCX ZIP container parses, word XML keeps Thai text and blank manuscript lines',async()=>{
+ const {makeDocx,makePlainText}=await import('../src/manuscript-export.js');
+ const original='หน้าแรก\n\nประโยคสุดท้าย  ';
+ const blob=makeDocx('ชื่อเรื่อง', [{position:1,title:'ชื่อตอน',body:original}]);
+ const bytes=new Uint8Array(await blob.arrayBuffer());
+ assert.ok(bytes.length>300);
+ let offset=0,entries=new Map();
+ while(offset+30<bytes.length){
+  const dv=new DataView(bytes.buffer,bytes.byteOffset+offset);
+  if(dv.getUint32(0,true)!==0x04034b50)break;
+  const nameLength=dv.getUint16(26,true),extra=dv.getUint16(28,true),length=dv.getUint32(18,true);
+  const name=new TextDecoder().decode(bytes.subarray(offset+30,offset+30+nameLength));
+  const start=offset+30+nameLength+extra;
+  entries.set(name,new TextDecoder().decode(bytes.subarray(start,start+length)));
+  offset=start+length;
+ }
+ assert.ok(entries.has('[Content_Types].xml'));
+ assert.ok(entries.has('_rels/.rels'));
+ assert.ok(entries.has('word/document.xml'));
+ assert.ok(entries.has('word/_rels/document.xml.rels'));
+ const xml=entries.get('word/document.xml');
+ assert.match(xml,/หน้าแรก/);assert.match(xml,/ประโยคสุดท้าย  /);
+ assert.match(xml,/w:pStyle w:val="Heading1"/);
+ assert.ok(xml.includes('หน้าแรก</w:t></w:r></w:p><w:p>'));
+ assert.ok(xml.includes('xml:space="preserve"></w:t>'));
+ assert.equal(makePlainText('ชื่อเรื่อง',[{position:1,title:'ชื่อตอน',body:original}]),'ชื่อเรื่อง\n\n1. ชื่อตอน\n'+original);
+});
+
+test('format export menu is visible only after the existing admin authorization',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="export-novel-pdf" hidden/);
+ assert.match(html,/id="export-chapter-pdf" hidden/);
+ assert.match(html,/data-export-format="docx"/);
+ assert.match(html,/data-export-format="txt"/);
+ assert.match(html,/data-export-format="pdf"/);
+ assert.match(html,/if\(!button\.isConnected\|\|!permission\.enabled\)return/);
+});
