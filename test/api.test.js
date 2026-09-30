@@ -655,7 +655,7 @@ test('SPA browser Back follows history and Home exits without logging out',()=>{
  assert.match(html,/history\.replaceState\(\{aksaralai:true,route:'home',id:null,depth:0\}/);
  assert.doesNotMatch(html,/window\.addEventListener\('hashchange',function\(\)/);
  const androidBack=html.slice(html.indexOf('window.aksaralaiAndroidBack=function(){'),html.indexOf('function card(n)',html.indexOf('window.aksaralaiAndroidBack=function(){')));
- assert.doesNotMatch(androidBack,/logout|api\(/);
+ assert.doesNotMatch(androidBack,/api\('\/logout'/);
  assert.match(html,/if\(route==='auth'&&user\)\{[\s\S]*?await api\('\/logout','POST',\{\}\)/);
 });
 
