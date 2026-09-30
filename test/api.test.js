@@ -642,23 +642,24 @@ test('whole chapter edit actions preserve the existing segmented mode and allow 
  assert.match(html,/if\(!d\.body\.trim\(\)\)\{toast\('กรุณากรอกเนื้อหานิยาย'\)/);
 });
 
-test('SPA browser Back follows navigation history and asks before logging out on Home',()=>{
+test('SPA browser Back follows history and Home exits without logging out',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  assert.match(html,/history\.pushState\(\{aksaralai:true,route:route,id:id\|\|null,depth:historyDepth\}/);
  assert.match(html,/window\.addEventListener\('popstate',function\(e\)/);
  assert.match(html,/historyDepth=state&&state\.aksaralai\?state\.depth\|\|0:0/);
  assert.match(html,/go\(route\|\|'home',id\|\|undefined,true\)/);
- assert.match(html,/if\(current\.route==='home'&&user\)/);
- assert.match(html,/askLogoutFromHome\(\)/);
- assert.match(html,/confirm\('อยู่หน้าแรกแล้ว ต้องการออกจากระบบอักษราลัยหรือไม่\?'\)/);
- assert.match(html,/await api\('\/logout','POST',\{\}\)/);
+ assert.match(html,/if\(current\.route==='home'\)return false/);
+ assert.doesNotMatch(html,/askLogoutFromHome|backLogoutBusy/);
  assert.match(html,/window\.aksaralaiAndroidBack=function\(\)/);
  assert.match(html,/history\.back\(\)/);
  assert.match(html,/history\.replaceState\(\{aksaralai:true,route:'home',id:null,depth:0\}/);
  assert.doesNotMatch(html,/window\.addEventListener\('hashchange',function\(\)/);
+ const androidBack=html.slice(html.indexOf('window.aksaralaiAndroidBack=function(){'),html.indexOf('function card(n)',html.indexOf('window.aksaralaiAndroidBack=function(){')));
+ assert.doesNotMatch(androidBack,/api\('\/logout'/);
+ assert.match(html,/if\(route==='auth'&&user\)\{[\s\S]*?await api\('\/logout','POST',\{\}\)/);
 });
 
-test('Android hardware Back invokes SPA route handler and shows native logout confirmation',()=>{
+test('Android hardware Back invokes SPA route handler and exits the app at Home',()=>{
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
  assert.match(java,/evaluateJavascript\([\s\S]{0,210}window\.aksaralaiAndroidBack/);
  assert.match(java,/if \("\\\"handled\\\""\.equals\(response\)\) return/);
