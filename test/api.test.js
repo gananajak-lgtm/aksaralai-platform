@@ -672,3 +672,16 @@ test('navigation persists unsaved chapter backup before returning to previous sc
  assert.match(html,/window\.aksaralaiPreserveDraft=function\(\)\{if\(chapterDirty\)\{clearTimeout\(backupTimer\);saveBackup\(\);\}\};/);
  assert.match(html,/if\(typeof window\.aksaralaiPreserveDraft==='function'\)/);
 });
+
+test('local voice studio links full unsaved manuscript to free desktop MP3 workflow',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="local-ai-voice-studio"/);
+ assert.match(html,/id="voice-copy-chapter"/);
+ assert.match(html,/href="http:\/\/127\.0\.0\.1:8765\/"/);
+ assert.match(html,/setupLocalVoiceStudio\(joinChapterText\)/);
+ assert.match(html,/var text=copyFullChapter\(\)/);
+ assert.match(html,/await navigator\.clipboard\.writeText\(text\)/);
+ assert.match(html,/modal\.querySelector\('textarea'\)\.value=text/);
+ assert.match(html,/chapterMp3Uploader\(id\)/);
+ assert.doesNotMatch(html,/revealAdminLocalVoiceStudio/);
+});
