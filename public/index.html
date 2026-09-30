@@ -114,7 +114,7 @@
 <script>
 (function(){
 'use strict';
-var app=document.getElementById('app'), user=null, current={route:'home'}, installPrompt=null, audio=null, pendingChapter=null, pendingFormatChapterId=null, historyDepth=0, backLogoutBusy=false, readsize=Number(localStorage.getItem('aksaralai.font')||19),theme=localStorage.getItem('aksaralai.theme')||'light',speed=Number(localStorage.getItem('aksaralai.speed')||1);
+var app=document.getElementById('app'), user=null, current={route:'home'}, installPrompt=null, audio=null, pendingChapter=null, pendingFormatChapterId=null, historyDepth=0, readsize=Number(localStorage.getItem('aksaralai.font')||19),theme=localStorage.getItem('aksaralai.theme')||'light',speed=Number(localStorage.getItem('aksaralai.speed')||1);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
 function toast(s){var t=document.getElementById('toast');t.textContent=s;t.classList.remove('hide');setTimeout(function(){t.classList.add('hide')},3200);}
 async function api(path,method,data){var opts={method:method||'GET',credentials:'same-origin',headers:{}};if(data!==undefined){opts.headers['content-type']='application/json';opts.body=JSON.stringify(data)}var r=await fetch('/api'+path,opts),o=await r.json();if(!r.ok){var e=new Error(o.detail||'ทำรายการไม่สำเร็จ');e.code=typeof o.code==='string'&&/^(?:LOGIN|AUTH)_[A-Z_]+$|^API_UNEXPECTED$/.test(o.code)?o.code:'';e.status=r.status;throw e;}return o;}
@@ -135,21 +135,12 @@ async function go(route,id,fromHistory){
  catch(e){app.innerHTML='<div class="notice">'+esc(e.message)+'</div>';}
  window.scrollTo({top:0,behavior:'instant'});
 }
-async function askLogoutFromHome(){
- if(backLogoutBusy||!user)return;
- if(!confirm('อยู่หน้าแรกแล้ว ต้องการออกจากระบบอักษราลัยหรือไม่?'))return;
- backLogoutBusy=true;
- try{await api('/logout','POST',{});await refresh();stop();toast('ออกจากระบบแล้ว');}
- catch(e){toast('ออกจากระบบไม่สำเร็จ: '+e.message);}
- finally{backLogoutBusy=false;}
-}
 window.aksaralaiAndroidBack=function(){
  if(document.querySelector('dialog[open]')){document.querySelector('dialog[open]').close();return true;}
  if(document.getElementById('mobile-navlinks').classList.contains('open')){closeMobileMenu();return true;}
- if(current.route==='home'){
-  if(user){askLogoutFromHome();return true;}
-  return false;
- }
+ // At Home Android must close its Activity without revoking the login cookie.
+ // Only the explicit header "ออกจากระบบ" action calls /api/logout.
+ if(current.route==='home')return false;
  if(historyDepth>1){history.back();return true;}
  go('home');return true;
 };
@@ -916,13 +907,9 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-go]'
 }go(route,id);});
 window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installPrompt=e;document.getElementById('install').hidden=false;});
 document.getElementById('install').onclick=async function(){if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.getElementById('install').hidden=true;}};
-// Browser back navigates the real app history; home back asks for logout.
+// Browser Back navigates app history, never signs out. Native Back at Home
+// exits the Activity via "exit" response; the session cookie remains intact.
 window.addEventListener('popstate',function(e){
- if(current.route==='home'&&user){
-  // Restore Home after native browser Back to avoid leaving before confirmation.
-  history.pushState({aksaralai:true,route:'home',id:null,depth:historyDepth},'',routeHash('home'));
-  askLogoutFromHome();return;
- }
  var state=e.state,route=state&&state.aksaralai?state.route:'home',id=state&&state.aksaralai?state.id:null;
  historyDepth=state&&state.aksaralai?state.depth||0:0;
  go(route||'home',id||undefined,true);
