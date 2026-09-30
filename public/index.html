@@ -315,8 +315,31 @@ function pronunciationText(text,entries){
  return out;
 }
 
+// The APK's WebView does not reliably expose browser speechSynthesis.
+// Wrap Android's native TextToSpeech behind the same small engine surface.
+function androidSpeechEngine(){
+ var bridge=window.AksaralaiTts,current=null,serial=0;
+ window.AksaralaiNativeSpeechFeedback=function(id,result){
+  if(!current||current.id!==id)return;
+  var utterance=current.utterance;current=null;
+  if(result==='done'){if(utterance.onend)utterance.onend();}
+  else if(utterance.onerror)utterance.onerror({error:'native-tts-failed'});
+ };
+ return {
+  native:true,onvoiceschanged:null,
+  ready:function(){try{return bridge.status();}catch(e){return 0;}},
+  getVoices:function(){try{return JSON.parse(bridge.voices());}catch(e){return [];}},
+  cancel:function(){current=null;try{bridge.stop();}catch(e){}},
+  speak:function(utterance){
+   var id=++serial;current={id:id,utterance:utterance};
+   try{bridge.speak(utterance.text,utterance.rate,utterance.voice?utterance.voice.voiceURI:'',id);}
+   catch(e){current=null;if(utterance.onerror)utterance.onerror({error:'native-tts-failed'});}
+  }
+ };
+}
 function initializeAudio(body,chapterId){
-var parts=splitText(body),engine=window.speechSynthesis,box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
+var nativeMode=!!window.AksaralaiTts,engine=nativeMode?androidSpeechEngine():window.speechSynthesis,Utterance=nativeMode?function(text){this.text=text;this.lang='th-TH';this.rate=1;this.voice=null;}:window.SpeechSynthesisUtterance;
+var parts=splitText(body),box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var storageKey='aksaralai.tts.chapter.'+chapterId;
 var pronWord=document.getElementById('pron-word'),pronSound=document.getElementById('pron-sound'),pronAdd=document.getElementById('pron-add'),pronEntriesBox=document.getElementById('pron-entries');
 function showPronunciations(){
@@ -343,10 +366,29 @@ function clearCheckpoint(){try{localStorage.removeItem(storageKey);}catch(e){}tr
 function saveBeforeExit(){if(active||index>0)checkpoint();}
 index=saved();
 box.innerHTML=parts.map(function(text,i){return '<span data-segment="'+i+'">'+esc(text)+'</span>'}).join('');
-if(!engine||!window.SpeechSynthesisUtterance){button.disabled=true;restartButton.disabled=true;state.textContent='อุปกรณ์นี้ไม่รองรับการอ่านเสียง';return;}
+if(!engine||!Utterance){button.disabled=true;restartButton.disabled=true;state.textContent='อุปกรณ์นี้ไม่รองรับการอ่านเสียง';return;}
+if(nativeMode){
+ button.disabled=true;restartButton.disabled=true;
+ var waiting=0,checkNative=setInterval(function(){
+  if(!button.isConnected){clearInterval(checkNative);return;}
+  var ready=engine.ready();
+  if(ready===1){
+   clearInterval(checkNative);
+   button.disabled=false;restartButton.disabled=false;
+   if(engine.onvoiceschanged)engine.onvoiceschanged();
+   state.textContent='พร้อมฟังด้วยระบบเสียง Android';
+   status();
+  }else if(ready===0||++waiting>=50){
+   clearInterval(checkNative);button.disabled=true;restartButton.disabled=true;
+   state.textContent='ยังไม่มีระบบอ่านข้อความไทยบน Android';
+   var note=document.getElementById('voice-note');
+   if(note)note.textContent='กรุณาตรวจสอบการตั้งค่า Android → ข้อความเป็นคำพูด (Text-to-speech) และติดตั้งข้อมูลเสียงภาษาไทย แล้วเปิดอักษราลัยอีกครั้ง';
+  }else state.textContent='กำลังเปิดระบบอ่านเสียงของ Android...';
+ },200);
+}
 // Only show Thai speech engines; other-language voices may silently use the same fallback.
 function voices(){return engine.getVoices().filter(function(v){return /^th(?:-|$)/i.test(v.lang)});}
-function setVoices(){var old=voice.value,list=voices(),seen=new Set();var distinct=list.filter(function(v){var key=v.voiceURI+'|'+v.lang;if(seen.has(key))return false;seen.add(key);return true;});voice.innerHTML='<option value="">เสียงไทยเริ่มต้นของอุปกรณ์</option>'+distinct.map(function(v){return '<option value="'+esc(v.voiceURI)+'">'+esc(v.name)+' ('+esc(v.lang)+')</option>'}).join('');if(old&&distinct.some(function(v){return v.voiceURI===old;}))voice.value=old;else voice.value='';var note=document.getElementById('voice-note');if(note)note.textContent=distinct.length===0?'เบราว์เซอร์ไม่รายงานรายชื่อเสียงภาษาไทย จึงลองใช้เสียงเริ่มต้นของอุปกรณ์':distinct.length===1?'อุปกรณ์รายงานเสียงภาษาไทย 1 เสียงเท่านั้น — การเปลี่ยนความเร็วไม่ใช่การเปลี่ยนนักพากย์':'อุปกรณ์รายงานเสียงไทย '+distinct.length+' รายการ แต่เสียงแต่ละชื่ออาจมีโทนเดียวกันขึ้นอยู่กับระบบสังเคราะห์เสียงของมือถือ';}
+function setVoices(){var old=voice.value,list=voices(),seen=new Set();var distinct=list.filter(function(v){var key=v.voiceURI+'|'+v.lang;if(seen.has(key))return false;seen.add(key);return true;});voice.innerHTML='<option value="">เสียงไทยเริ่มต้นของอุปกรณ์</option>'+distinct.map(function(v){return '<option value="'+esc(v.voiceURI)+'">'+esc(v.name)+' ('+esc(v.lang)+')</option>'}).join('');if(old&&distinct.some(function(v){return v.voiceURI===old;}))voice.value=old;else voice.value='';var note=document.getElementById('voice-note');if(note)note.textContent=distinct.length===0?(nativeMode?'Android ยังไม่รายงานเสียงภาษาไทยแยก แต่สามารถลองใช้เสียงไทยเริ่มต้นได้':'เบราว์เซอร์ไม่รายงานรายชื่อเสียงภาษาไทย จึงลองใช้เสียงเริ่มต้นของอุปกรณ์'):distinct.length===1?'อุปกรณ์รายงานเสียงภาษาไทย 1 เสียงเท่านั้น — การเปลี่ยนความเร็วไม่ใช่การเปลี่ยนนักพากย์':'อุปกรณ์รายงานเสียงไทย '+distinct.length+' รายการ แต่เสียงแต่ละชื่ออาจมีโทนเดียวกันขึ้นอยู่กับระบบสังเคราะห์เสียงของมือถือ';}
 setVoices();engine.onvoiceschanged=setVoices;rate.value=String(speed);
 function status(){
  button.textContent=!active?(index>0?'▶ ฟังต่อจากจุดเดิม':'▶ เริ่มฟัง'):paused?'▶ ฟังต่อ':'⏸ พักเสียง';
@@ -360,7 +402,7 @@ function say(t){
  checkpoint();mark();status();
  var spokenFrom=offset,raw=parts[index].slice(spokenFrom),clean=pronunciationText(speechText(raw),pronunciationEntries());
  if(!clean){index++;offset=0;checkpoint();say(t);return;}
- var utterance=new SpeechSynthesisUtterance(clean);utterance.lang='th-TH';utterance.rate=speed;
+ var utterance=new Utterance(clean);utterance.lang='th-TH';utterance.rate=speed;
  // Speech boundary indices refer to the synthesized string, not the original novel.
  // Use them only when the spoken text matches the original exactly.
  if(raw===clean)utterance.onboundary=function(e){if(t!==ticket||!active||paused)return;if(Number.isInteger(e.charIndex)&&e.charIndex>0){offset=Math.min(parts[index].length-1,spokenFrom+e.charIndex);checkpoint();}};
