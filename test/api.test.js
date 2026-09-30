@@ -236,3 +236,30 @@ test('mobile home uses compact book cards and collapsible accessible navigation'
  assert.match(html,/function closeMobileMenu\(\)/);
  assert.match(html,/menuToggle\.setAttribute\('aria-expanded',String\(opening\)\)/);
 });
+
+test('long chapter editing preserves all paragraph breaks and leading/trailing whitespace',async()=>{
+ const h=harness();
+ assert.equal((await h.api('/register','POST',{username:'longwriter',display_name:'Writer',password:'long-password-15',role:'writer'})).status,201);
+ const n=await h.api('/writer/novels','POST',{title:'เรื่องยาว',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const original='  คำนำ  \n'+('บทสนทนา “ทดสอบ” และบรรยายยาวๆ\n\n'.repeat(1800))+'  จบตอน  \n';
+ assert.ok(original.length>30000);
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนแรก',body:original});
+ assert.equal(c.status,201);
+ assert.equal((await h.api('/chapters/'+c.id)).chapter.body,original);
+ const updated='\n'+original+'\nเพิ่มข้อความท้ายตอนและอีโมจิ 🎙️\n\n';
+ assert.equal((await h.api('/writer/chapters/'+c.id,'PUT',{title:'ตอนแก้ไข',body:updated})).status,200);
+ assert.equal((await h.api('/chapters/'+c.id)).chapter.body,updated);
+ assert.equal((await h.api('/writer/chapters/'+c.id,'PUT',{title:'ตอนแก้ไข',body:'   \n   '})).status,400);
+});
+
+test('mobile long-chapter editor uses bounded editable segments and local draft recovery',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/function splitChapterText\(text\)/);
+ assert.match(html,/max=4500/);
+ assert.match(html,/chapterSegments\.join\(''\)/);
+ assert.match(html,/d\.body=joinChapterText\(\)/);
+ assert.match(html,/chapterEditor\.value=chapterSegments\[0\]/);
+ assert.match(html,/backupTimer=setTimeout\(saveBackup,2500\)/);
+ assert.match(html,/confirm\('พบข้อความแก้ไขที่ยังไม่ได้บันทึก/);
+ assert.doesNotMatch(html,/<textarea name="body" required style="min-height:370px" maxlength="300000">\'\+esc\(chapter\?\.body/);
+});
