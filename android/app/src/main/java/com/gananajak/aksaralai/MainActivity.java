@@ -553,6 +553,20 @@ public class MainActivity extends Activity {
         uploadCallback=null;
     }
 
+    private boolean closePromptShowing = false;
+
+    private void confirmCloseApp() {
+        if (isFinishing() || isDestroyed() || closePromptShowing) return;
+        closePromptShowing = true;
+        new AlertDialog.Builder(this)
+            .setTitle("ปิดแอปอักษราลัย")
+            .setMessage("ต้องการปิดแอปหรือไม่? ระบบจะเก็บการเข้าสู่ระบบไว้")
+            .setNegativeButton("ยกเลิก", (dialog, which) -> { })
+            .setPositiveButton("ปิดแอป", (dialog, which) -> finish())
+            .setOnDismissListener(dialog -> closePromptShowing = false)
+            .show();
+    }
+
     @Override public void onBackPressed() {
         if (webView == null) { super.onBackPressed(); return; }
         if (!trustedTopLevelPage) {
@@ -567,9 +581,9 @@ public class MainActivity extends Activity {
             "return window.aksaralaiAndroidBack()?'handled':'exit';})()",
             response -> {
                 if ("\"handled\"".equals(response)) return;
-                if ("\"exit\"".equals(response)) { finish(); return; }
+                if ("\"exit\"".equals(response)) { confirmCloseApp(); return; }
                 if (webView.canGoBack()) webView.goBack();
-                else finish();
+                else confirmCloseApp();
             }
         );
     }
