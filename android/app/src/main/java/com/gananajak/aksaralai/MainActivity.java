@@ -144,7 +144,9 @@ public class MainActivity extends Activity {
             return state.toString();
         }
 
-        // The bridge chapter ID is a strict numeric account:chapter pair. Do not resume\n        // an older account's checkpoint when a different reader uses this device.\n        @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
+        // The bridge chapter ID is a strict numeric account:chapter pair. Do not resume
+        // an older account's checkpoint when a different reader uses this device.
+        @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
             if (!trustedTopLevelPage || chapter == null || !chapter.matches("[0-9]{1,12}:[0-9]{1,12}")) return 0;
             String value = getSharedPreferences("aksaralai-tts", MODE_PRIVATE)
                 .getString("progress." + chapter, "");
