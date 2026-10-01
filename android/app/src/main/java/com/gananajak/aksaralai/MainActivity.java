@@ -74,6 +74,7 @@ public class MainActivity extends Activity {
     private boolean appForeground = true;
     private String batchVoice = "";
     private float batchSpeed = 1f;
+    private int batchPauseMs = 600;
 
     private void reportBatch(int session, int index, String event) {
         if (!appForeground || !trustedTopLevelPage || webView == null) return;
@@ -132,6 +133,11 @@ public class MainActivity extends Activity {
     }
 
     private final class NativeSpeech {
+        @JavascriptInterface public void setBatchPause(int pause) {
+            if (!trustedTopLevelPage || pause < 0 || pause > 1000) return;
+            runOnUiThread(() -> batchPauseMs = pause);
+        }
+
         @JavascriptInterface public String batchState() {
             if (!trustedTopLevelPage) return "{}";
             JSONObject state = new JSONObject();
@@ -386,6 +392,23 @@ public class MainActivity extends Activity {
                             int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
                             runOnUiThread(() -> {
                                 if(batchSession!=session || batchCursor!=pos) return;
+                                if(batchPauseMs>0 && pos+1<batchTotal && nativeTts!=null) {
+                                    int silence=nativeTts.playSilentUtterance(batchPauseMs, TextToSpeech.QUEUE_ADD,
+                                        "P-" + session + "-" + pos);
+                                    if(silence!=TextToSpeech.ERROR)return;
+                                }
+                                batchCursor=pos+1;
+                                nativeNext(session);
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
+                    if (utteranceId != null && utteranceId.startsWith("P-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(batchSession!=session || batchCursor!=pos) return;
                                 batchCursor=pos+1;
                                 nativeNext(session);
                             });
@@ -404,6 +427,19 @@ public class MainActivity extends Activity {
                                 if(batchSession!=session || batchCursor!=pos) return;
                                 reportBatch(session,batchBaseIndex+pos,"error");
                                 clearBatch(false);
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
+                    if (utteranceId != null && utteranceId.startsWith("P-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(batchSession!=session || batchCursor!=pos) return;
+                                // A failed silent gap should not stop the reader.
+                                batchCursor=pos+1;
+                                nativeNext(session);
                             });
                         } catch (NumberFormatException ignored) {}
                         return;
