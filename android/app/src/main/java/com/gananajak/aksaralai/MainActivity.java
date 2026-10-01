@@ -144,8 +144,8 @@ public class MainActivity extends Activity {
             return state.toString();
         }
 
-        @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
-            if (!trustedTopLevelPage || chapter == null || !chapter.matches("[0-9]{1,12}")) return 0;
+        // The bridge chapter ID is a strict numeric account:chapter pair. Do not resume\n        // an older account's checkpoint when a different reader uses this device.\n        @JavascriptInterface public int savedBatchIndex(String chapter, String signature) {
+            if (!trustedTopLevelPage || chapter == null || !chapter.matches("[0-9]{1,12}:[0-9]{1,12}")) return 0;
             String value = getSharedPreferences("aksaralai-tts", MODE_PRIVATE)
                 .getString("progress." + chapter, "");
             try {
@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
             if (!trustedTopLevelPage) return;
             if (json == null || json.length() > 600000 || session < 1 ||
                 !Double.isFinite(speed) || speed < 0.5 || speed > 2 ||
-                chapter == null || !chapter.matches("[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
+                chapter == null || !chapter.matches("[0-9]{1,12}:[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
                 signature == null || signature.length() > 512) return;
             final List<String> pieces = new ArrayList<>();
             try {
