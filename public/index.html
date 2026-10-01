@@ -447,8 +447,15 @@ function androidSpeechEngine(){
  };
  return {
   native:true,onvoiceschanged:null,
-  batchAvailable:typeof bridge.speakBatch==='function',
-  batch:function(parts,pauses,speed,voice,session,chapter,signature,start){bridge.speakBatch(JSON.stringify(parts),JSON.stringify(pauses),speed,voice,session,String(chapter),signature,start);},
+  batchAvailable:typeof bridge.speakBatch==='function'||typeof bridge.speakBatchWithPauses==='function',
+  batch:function(parts,pauses,speed,voice,session,chapter,signature,start){
+   // Old installed APKs expose the original seven-argument native method.
+   // The dialogue-pause protocol uses a distinct name to avoid silent JNI arity failures.
+   if(typeof bridge.speakBatchWithPauses==='function')
+    bridge.speakBatchWithPauses(JSON.stringify(parts),JSON.stringify(pauses),speed,voice,session,String(chapter),signature,start);
+   else if(typeof bridge.speakBatch==='function')
+    bridge.speakBatch(JSON.stringify(parts),speed,voice,session,String(chapter),signature,start);
+  },
   
   batchState:function(){try{return JSON.parse(bridge.batchState());}catch(e){return {};}},
   savedBatchIndex:function(chapter,signature){try{return bridge.savedBatchIndex(String(chapter),signature);}catch(e){return 0;}},
