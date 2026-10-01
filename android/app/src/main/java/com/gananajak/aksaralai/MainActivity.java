@@ -158,7 +158,20 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { return 0; }
         }
 
-        @JavascriptInterface public void speakBatch(String json, String pauseJson, double speed, String selected,
+        // Legacy entrypoint for already deployed website code: retain the old seven-argument signature.
+        @JavascriptInterface public void speakBatch(String json, double speed, String selected,
+                                                      int session, String chapter, String signature, int startIndex) {
+            if (json == null) return;
+            try {
+                JSONArray chunks = new JSONArray(json);
+                JSONArray zeros = new JSONArray();
+                for (int i = 0; i < chunks.length(); i++) zeros.put(0);
+                speakBatchWithPauses(json, zeros.toString(), speed, selected, session, chapter, signature, startIndex);
+            } catch (Exception ignored) {}
+        }
+
+        // New website passes per-dialogue silence durations without changing the legacy signature.
+        @JavascriptInterface public void speakBatchWithPauses(String json, String pauseJson, double speed, String selected,
                                                       int session, String chapter, String signature, int startIndex) {
             if (!trustedTopLevelPage) return;
             if (json == null || pauseJson == null || json.length() > 600000 || pauseJson.length() > 28000 || session < 1 ||
