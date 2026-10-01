@@ -317,7 +317,7 @@ test('admin PDF buttons are hidden until privileged status confirms admin',()=>{
 test('novel detail layout gives mobile title and synopsis separate readable rows',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  assert.match(html,/class="panel novel-detail"/);
- assert.match(html,/class="cover novel-cover"/);
+ assert.match(html,/coverView\(n,'novel-cover'\)/);
  assert.match(html,/class="novel-info"/);
  assert.match(html,/class="novel-summary"/);
  assert.match(html,/class="controls novel-actions"/);
