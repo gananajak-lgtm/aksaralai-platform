@@ -756,7 +756,7 @@ test('dialogue-only pauses preserve narration flow in browser and Android native
 test('native TTS maintains compatibility with installed old and new APKs',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
- assert.match(html,/batchAvailable:typeof bridge\.speakBatch==='function'\|\|typeof bridge\.speakBatchWithPauses==='function'/);
+ assert.match(html,/batchAvailable:typeof bridge\.speakBatchWithPauses==='function'/);
  assert.match(html,/if\(typeof bridge\.speakBatchWithPauses==='function'\)[\s\S]*?bridge\.speakBatchWithPauses\(JSON\.stringify\(parts\),JSON\.stringify\(pauses\),speed/);
  assert.match(html,/else if\(typeof bridge\.speakBatch==='function'\)[\s\S]*?bridge\.speakBatch\(JSON\.stringify\(parts\),speed,voice,session,String\(chapter\),signature,start\)/);
  assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
