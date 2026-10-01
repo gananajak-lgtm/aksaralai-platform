@@ -763,3 +763,50 @@ test('native TTS maintains compatibility with installed old and new APKs',()=>{
  assert.match(java,/@JavascriptInterface public void speakBatchWithPauses\(String json, String pauseJson, double speed, String selected,/);
  assert.match(java,/speakBatchWithPauses\(json, zeros\.toString\(\), speed, selected, session, chapter, signature, startIndex\)/);
 });
+
+
+test('novel cover upload is owner-only, image-validated and readable with novel visibility',async()=>{
+ const objects=new Map();
+ const AUDIO={
+  async put(key,body,options){objects.set(key,{bytes:new Uint8Array(body),httpMetadata:options?.httpMetadata||{},customMetadata:options?.customMetadata||{}});},
+  async get(key){const o=objects.get(key);return o?{body:o.bytes,size:o.bytes.byteLength,httpMetadata:o.httpMetadata,customMetadata:o.customMetadata}:null;},
+  async delete(key){objects.delete(key);}
+ };
+ const h=harness({AUDIO});
+ assert.equal((await h.api('/register','POST',{username:'coverwriter',display_name:'Cover Writer',password:'long-password-01',role:'writer'})).status,201);
+ const writerCookie=h.getCookie();
+ const n=await h.api('/writer/novels','POST',{title:'เรื่องมีปก',summary:'ทดสอบภาพปก',genre:'แฟนตาซี',cover_color:'#7453a8'});
+ const png=new Uint8Array(40);png.set([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
+ let req=new Request('https://example.com/api/writer/novels/'+n.id+'/cover',{method:'PUT',headers:{origin:'https://example.com',cookie:writerCookie,'content-type':'image/png'},body:png});
+ let res=await worker.fetch(req,h.env);assert.equal(res.status,200);assert.ok(objects.has('covers/'+n.id));
+ req=new Request('https://example.com/api/novels/'+n.id+'/cover',{headers:{cookie:writerCookie}});
+ res=await worker.fetch(req,h.env);assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'image/png');
+ h.clear();
+ req=new Request('https://example.com/api/novels/'+n.id+'/cover');
+ res=await worker.fetch(req,h.env);assert.equal(res.status,404,'draft cover must not leak publicly');
+ h.setCookie(writerCookie);
+ const c=await h.api('/writer/novels/'+n.id+'/chapters','POST',{title:'ตอนแรก',body:'เนื้อหา'});
+ await h.api('/writer/chapters/'+c.id+'/publish','POST',{published:true});
+ await h.api('/writer/novels/'+n.id+'/publish','POST',{published:true});
+ h.clear();
+ req=new Request('https://example.com/api/novels/'+n.id+'/cover');
+ res=await worker.fetch(req,h.env);assert.equal(res.status,200);
+ const bad=new TextEncoder().encode('this is not a real image file at all');
+ req=new Request('https://example.com/api/writer/novels/'+n.id+'/cover',{method:'PUT',headers:{origin:'https://example.com',cookie:writerCookie,'content-type':'image/png'},body:bad});
+ res=await worker.fetch(req,h.env);assert.equal(res.status,400);
+ req=new Request('https://example.com/api/writer/novels/'+n.id+'/cover',{method:'DELETE',headers:{origin:'https://example.com',cookie:writerCookie}});
+ res=await worker.fetch(req,h.env);assert.equal(res.status,200);assert.equal(objects.has('covers/'+n.id),false);
+});
+
+test('writer UI supports selecting, previewing, removing and displaying real novel cover art',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/function coverView\(n,extra\)/);
+ assert.match(html,/src="\/api\/novels\/'\+id\+'\/cover"/);
+ assert.match(html,/id="cover-file" name="cover_file" type="file" accept="image\/jpeg,image\/png,image\/webp"/);
+ assert.match(html,/ภาพหน้าปกต้องไม่เกิน 5 MB/);
+ assert.match(html,/URL\.createObjectURL\(file\)/);
+ assert.match(html,/fetch\('\/api\/writer\/novels\/'\+nid\+'\/cover',\{method:'PUT'/);
+ assert.match(html,/id="remove-cover"/);
+ assert.match(html,/method:'DELETE'/);
+ assert.match(html,/object-fit:cover/);
+});
