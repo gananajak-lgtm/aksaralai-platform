@@ -729,3 +729,22 @@ test('playback resume is isolated for three different users sharing one Android 
  assert.doesNotMatch(html,/getItem\('aksaralai\.tts\.chapter\.'\+chapterId\)/);
  assert.doesNotMatch(html,/getItem\('aksaralai\.mp3\.position\.'\+chapterId\)/);
 });
+
+test('readers can adjust TTS pause separately from speed, including Android background speech',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ assert.match(html,/id="tts-pause" aria-label="ระยะพักเสียงระหว่างช่วง"/);
+ for(const ms of [0,350,600,1000])assert.match(html,new RegExp('<option value="'+ms+'">'));
+ assert.match(html,/localStorage\.getItem\('aksaralai\.tts\.pauseMs'\)/);
+ assert.match(html,/localStorage\.setItem\('aksaralai\.tts\.pauseMs',String\(pauseMs\)\)/);
+ assert.match(html,/if\(typeof bridge\.setBatchPause==='function'\)bridge\.setBatchPause\(ms\)/);
+ assert.match(html,/engine\.setBatchPause\(pauseMs\)/);
+ assert.match(html,/var delay=pauseMs\+\(paragraphEnd\?400:0\)/);
+ assert.match(java,/private int batchPauseMs = 600/);
+ assert.match(java,/@JavascriptInterface public void setBatchPause\(int pause\)/);
+ assert.match(java,/if \(!trustedTopLevelPage \|\| pause < 0 \|\| pause > 1000\) return/);
+ assert.match(java,/nativeTts\.playSilentUtterance\(batchPauseMs, TextToSpeech\.QUEUE_ADD/);
+ assert.match(java,/utteranceId\.startsWith\("P-"\)/);
+ assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
+ assert.match(java,/if\(batchSession!=session \|\| batchCursor!=pos\) return/);
+});
