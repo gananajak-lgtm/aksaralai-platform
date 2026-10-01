@@ -74,7 +74,7 @@ public class MainActivity extends Activity {
     private boolean appForeground = true;
     private String batchVoice = "";
     private float batchSpeed = 1f;
-    private int batchPauseMs = 600;
+    private List<Integer> batchPauses = new ArrayList<>();
 
     private void reportBatch(int session, int index, String event) {
         if (!appForeground || !trustedTopLevelPage || webView == null) return;
@@ -88,6 +88,7 @@ public class MainActivity extends Activity {
                 .remove("progress." + batchChapter).apply();
         }
         batchPieces.clear();
+        batchPauses.clear();
         batchSession = 0;
         batchCursor = 0;
         batchBaseIndex = 0;
@@ -133,11 +134,6 @@ public class MainActivity extends Activity {
     }
 
     private final class NativeSpeech {
-        @JavascriptInterface public void setBatchPause(int pause) {
-            if (!trustedTopLevelPage || pause < 0 || pause > 1000) return;
-            runOnUiThread(() -> batchPauseMs = pause);
-        }
-
         @JavascriptInterface public String batchState() {
             if (!trustedTopLevelPage) return "{}";
             JSONObject state = new JSONObject();
@@ -162,16 +158,19 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { return 0; }
         }
 
-        @JavascriptInterface public void speakBatch(String json, double speed, String selected,
+        @JavascriptInterface public void speakBatch(String json, String pauseJson, double speed, String selected,
                                                       int session, String chapter, String signature, int startIndex) {
             if (!trustedTopLevelPage) return;
-            if (json == null || json.length() > 600000 || session < 1 ||
+            if (json == null || pauseJson == null || json.length() > 600000 || pauseJson.length() > 28000 || session < 1 ||
                 !Double.isFinite(speed) || speed < 0.5 || speed > 2 ||
                 chapter == null || !chapter.matches("[0-9]{1,12}:[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
                 signature == null || signature.length() > 512) return;
             final List<String> pieces = new ArrayList<>();
+            final List<Integer> pauses = new ArrayList<>();
             try {
                 JSONArray arr = new JSONArray(json);
+                JSONArray silences = new JSONArray(pauseJson);
+                if (silences.length() != arr.length()) return;
                 if (arr.length() < 1 || arr.length() > 4000) return;
                 int totalChars = 0;
                 for (int i = 0; i < arr.length(); i++) {
@@ -180,6 +179,9 @@ public class MainActivity extends Activity {
                     totalChars += words.length();
                     if (totalChars > 350000) return;
                     pieces.add(words);
+                    int pause = silences.getInt(i);
+                    if (pause < 0 || pause > 2200) return;
+                    pauses.add(pause);
                 }
             } catch (Exception ignored) { return; }
             runOnUiThread(() -> {
@@ -191,6 +193,7 @@ public class MainActivity extends Activity {
                 clearBatch(false);
                 batchSession = session;
                 batchPieces = pieces;
+                batchPauses = pauses;
                 batchCursor = 0;
                 batchBaseIndex = startIndex;
                 batchTotal = pieces.size();
@@ -392,8 +395,9 @@ public class MainActivity extends Activity {
                             int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
                             runOnUiThread(() -> {
                                 if(batchSession!=session || batchCursor!=pos) return;
-                                if(batchPauseMs>0 && pos+1<batchTotal && nativeTts!=null) {
-                                    int silence=nativeTts.playSilentUtterance(batchPauseMs, TextToSpeech.QUEUE_ADD,
+                                int pause=pos<batchPauses.size()?batchPauses.get(pos):0;
+                                if(pause>0 && pos+1<batchTotal && nativeTts!=null) {
+                                    int silence=nativeTts.playSilentUtterance(pause, TextToSpeech.QUEUE_ADD,
                                         "P-" + session + "-" + pos);
                                     if(silence!=TextToSpeech.ERROR)return;
                                 }
