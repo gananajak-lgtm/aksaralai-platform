@@ -447,7 +447,9 @@ function androidSpeechEngine(){
  };
  return {
   native:true,onvoiceschanged:null,
-  batchAvailable:typeof bridge.speakBatch==='function'||typeof bridge.speakBatchWithPauses==='function',
+  // Only opt into native batch when the named protocol exists. Version 0.1.9 had an
+  // incompatible speakBatch arity; older APKs safely use individual speech callbacks.
+  batchAvailable:typeof bridge.speakBatchWithPauses==='function',
   batch:function(parts,pauses,speed,voice,session,chapter,signature,start){
    // Old installed APKs expose the original seven-argument native method.
    // The dialogue-pause protocol uses a distinct name to avoid silent JNI arity failures.
