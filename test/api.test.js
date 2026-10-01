@@ -422,7 +422,7 @@ test('Android background TTS advances in native onDone without WebView JavaScrip
  assert.match(java,/savedBatchIndex\(String chapter, String signature\)/);
  assert.match(java,/onPause\(\) \{\s*appForeground=false/);
  assert.match(html,/nativeBatchMode=nativeMode&&engine\.batchAvailable/);
- assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.match(html,/engine\.batch\(prepared,pauseDurations,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(html,/AksaralaiNativeBatchFeedback/);
  assert.match(html,/engine\.batchState\(\)/);
 });
@@ -712,7 +712,7 @@ test('playback resume is isolated for three different users sharing one Android 
  // Native background TTS does not read or overwrite the previous account's position.
  assert.match(html,/nativeChapter=accountId\+':'\+chapterId/);
  assert.match(html,/engine\.savedBatchIndex\(nativeChapter,signature\)/);
- assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.match(html,/engine\.batch\(prepared,pauseDurations,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(html,/String\(state\.chapter\)!==nativeChapter/);
  assert.equal((java.match(/chapter\.matches\("\[0-9\]\{1,12\}:\[0-9\]\{1,12\}"\)/g)||[]).length,2);
  assert.match(java,/getString\("progress\." \+ chapter,/);
@@ -730,21 +730,23 @@ test('playback resume is isolated for three different users sharing one Android 
  assert.doesNotMatch(html,/getItem\('aksaralai\.mp3\.position\.'\+chapterId\)/);
 });
 
-test('readers can adjust TTS pause separately from speed, including Android background speech',()=>{
+test('dialogue-only pauses preserve narration flow in browser and Android native background TTS',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
- assert.match(html,/id="tts-pause" aria-label="ระยะพักเสียงระหว่างช่วง"/);
- for(const ms of [0,350,600,1000])assert.match(html,new RegExp('<option value="'+ms+'">'));
- assert.match(html,/localStorage\.getItem\('aksaralai\.tts\.pauseMs'\)/);
- assert.match(html,/localStorage\.setItem\('aksaralai\.tts\.pauseMs',String\(pauseMs\)\)/);
- assert.match(html,/if\(typeof bridge\.setBatchPause==='function'\)bridge\.setBatchPause\(ms\)/);
- assert.match(html,/engine\.setBatchPause\(pauseMs\)/);
- assert.match(html,/var delay=pauseMs\+\(paragraphEnd\?400:0\)/);
- assert.match(java,/private int batchPauseMs = 600/);
- assert.match(java,/@JavascriptInterface public void setBatchPause\(int pause\)/);
- assert.match(java,/if \(!trustedTopLevelPage \|\| pause < 0 \|\| pause > 1000\) return/);
- assert.match(java,/nativeTts\.playSilentUtterance\(batchPauseMs, TextToSpeech\.QUEUE_ADD/);
+ assert.match(html,/id="tts-pause" aria-label="ระยะพักเสียงเมื่อเปลี่ยนบทพูด"/);
+ for(const ms of [0,600,1000,1500,2200])assert.match(html,new RegExp('<option value="'+ms+'">'));
+ assert.match(html,/localStorage\.getItem\('aksaralai\.tts\.dialoguePauseMs'\)/);
+ assert.match(html,/localStorage\.setItem\('aksaralai\.tts\.dialoguePauseMs',String\(pauseMs\)\)/);
+ assert.match(html,/function dialoguePauseAfter\(parts,i,pause\)/);
+ assert.match(html,/var delay=\(paragraphEnd\?320:0\)\+dialoguePauseAfter\(parts,index-1,pauseMs\)/);
+ assert.match(html,/var pauseDurations=prepared\.map\(function\(_,pos\)\{return dialoguePauseAfter\(parts,batchBase\+pos,pauseMs\);\}\)/);
+ assert.match(html,/bridge\.speakBatch\(JSON\.stringify\(parts\),JSON\.stringify\(pauses\),speed/);
+ assert.match(java,/public void speakBatch\(String json, String pauseJson, double speed/);
+ assert.match(java,/if \(silences\.length\(\) != arr\.length\(\)\) return/);
+ assert.match(java,/if \(pause < 0 \|\| pause > 2200\) return/);
+ assert.match(java,/batchPauses = pauses/);
+ assert.match(java,/nativeTts\.playSilentUtterance\(pause, TextToSpeech\.QUEUE_ADD/);
  assert.match(java,/utteranceId\.startsWith\("P-"\)/);
  assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
- assert.match(java,/if\(batchSession!=session \|\| batchCursor!=pos\) return/);
+ assert.doesNotMatch(java,/@JavascriptInterface public void setBatchPause/);
 });
