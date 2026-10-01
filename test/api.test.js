@@ -422,7 +422,7 @@ test('Android background TTS advances in native onDone without WebView JavaScrip
  assert.match(java,/savedBatchIndex\(String chapter, String signature\)/);
  assert.match(java,/onPause\(\) \{\s*appForeground=false/);
  assert.match(html,/nativeBatchMode=nativeMode&&engine\.batchAvailable/);
- assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,chapterId,signature,batchBase\)/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(html,/AksaralaiNativeBatchFeedback/);
  assert.match(html,/engine\.batchState\(\)/);
 });
@@ -695,4 +695,37 @@ test('local voice studio links full unsaved manuscript to free desktop MP3 workf
  assert.match(html,/modal\.querySelector\('textarea'\)\.value=text/);
  assert.match(html,/chapterMp3Uploader\(id\)/);
  assert.doesNotMatch(html,/revealAdminLocalVoiceStudio/);
+});
+
+test('playback resume is isolated for three different users sharing one Android app',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ // Each reader has a separate MP3 checkpoint even for the exact same published chapter.
+ assert.match(html,/var key='aksaralai\.mp3\.position\.user\.'\+user\.id\+'\.chapter\.'\+chapterId/);
+ assert.doesNotMatch(html,/var key='aksaralai\.mp3\.position\.'\+chapterId/);
+ // Each reader has a separate speech checkpoint and "listen again" shortcut.
+ assert.match(html,/storageKey='aksaralai\.tts\.chapter\.user\.'\+accountId\+'\.chapter\.'\+chapterId/);
+ assert.match(html,/lastListeningKey='aksaralai\.tts\.last\.user\.'\+accountId/);
+ assert.match(html,/localStorage\.getItem\('aksaralai\.tts\.last\.user\.'\+user\.id\)/);
+ assert.match(html,/localStorage\.setItem\(lastListeningKey,JSON\.stringify/);
+ assert.match(html,/localStorage\.removeItem\(lastListeningKey\)/);
+ // Native background TTS does not read or overwrite the previous account's position.
+ assert.match(html,/nativeChapter=accountId\+':'\+chapterId/);
+ assert.match(html,/engine\.savedBatchIndex\(nativeChapter,signature\)/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.match(html,/String\(state\.chapter\)!==nativeChapter/);
+ assert.equal((java.match(/chapter\.matches\("\[0-9\]\{1,12\}:\[0-9\]\{1,12\}"\)/g)||[]).length,2);
+ assert.match(java,/getString\("progress\." \+ chapter,/);
+ assert.match(java,/putString\("progress\." \+ batchChapter,/);
+ const savedPositions=new Map();
+ for(const [userId,index] of [[1,7],[2,32],[3,85]])
+  savedPositions.set('aksaralai.tts.chapter.user.'+userId+'.chapter.42',index);
+ assert.deepEqual([1,2,3].map(id=>savedPositions.get('aksaralai.tts.chapter.user.'+id+'.chapter.42')),[7,32,85]);
+ const nativePositions=new Map();
+ for(const [userId,index] of [[1,7],[2,32],[3,85]])nativePositions.set('progress.'+userId+':42',index);
+ assert.deepEqual([1,2,3].map(id=>nativePositions.get('progress.'+id+':42')),[7,32,85]);
+ // Legacy shared checkpoints are never reused or silently migrated into an account.
+ assert.doesNotMatch(html,/getItem\('aksaralai\.tts\.last'\)/);
+ assert.doesNotMatch(html,/getItem\('aksaralai\.tts\.chapter\.'\+chapterId\)/);
+ assert.doesNotMatch(html,/getItem\('aksaralai\.mp3\.position\.'\+chapterId\)/);
 });
