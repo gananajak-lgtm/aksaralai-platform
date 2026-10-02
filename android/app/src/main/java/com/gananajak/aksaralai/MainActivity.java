@@ -74,7 +74,6 @@ public class MainActivity extends Activity {
     private boolean appForeground = true;
     private String batchVoice = "";
     private float batchSpeed = 1f;
-    private List<Integer> batchPauses = new ArrayList<>();
 
     private void reportBatch(int session, int index, String event) {
         if (!appForeground || !trustedTopLevelPage || webView == null) return;
@@ -88,7 +87,6 @@ public class MainActivity extends Activity {
                 .remove("progress." + batchChapter).apply();
         }
         batchPieces.clear();
-        batchPauses.clear();
         batchSession = 0;
         batchCursor = 0;
         batchBaseIndex = 0;
@@ -158,32 +156,16 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { return 0; }
         }
 
-        // Legacy entrypoint for already deployed website code: retain the old seven-argument signature.
         @JavascriptInterface public void speakBatch(String json, double speed, String selected,
                                                       int session, String chapter, String signature, int startIndex) {
-            if (json == null) return;
-            try {
-                JSONArray chunks = new JSONArray(json);
-                JSONArray zeros = new JSONArray();
-                for (int i = 0; i < chunks.length(); i++) zeros.put(0);
-                speakBatchWithPauses(json, zeros.toString(), speed, selected, session, chapter, signature, startIndex);
-            } catch (Exception ignored) {}
-        }
-
-        // New website passes per-dialogue silence durations without changing the legacy signature.
-        @JavascriptInterface public void speakBatchWithPauses(String json, String pauseJson, double speed, String selected,
-                                                      int session, String chapter, String signature, int startIndex) {
             if (!trustedTopLevelPage) return;
-            if (json == null || pauseJson == null || json.length() > 600000 || pauseJson.length() > 28000 || session < 1 ||
+            if (json == null || json.length() > 600000 || session < 1 ||
                 !Double.isFinite(speed) || speed < 0.5 || speed > 2 ||
                 chapter == null || !chapter.matches("[0-9]{1,12}:[0-9]{1,12}") || startIndex < 0 || startIndex > 4000 ||
                 signature == null || signature.length() > 512) return;
             final List<String> pieces = new ArrayList<>();
-            final List<Integer> pauses = new ArrayList<>();
             try {
                 JSONArray arr = new JSONArray(json);
-                JSONArray silences = new JSONArray(pauseJson);
-                if (silences.length() != arr.length()) return;
                 if (arr.length() < 1 || arr.length() > 4000) return;
                 int totalChars = 0;
                 for (int i = 0; i < arr.length(); i++) {
@@ -192,9 +174,6 @@ public class MainActivity extends Activity {
                     totalChars += words.length();
                     if (totalChars > 350000) return;
                     pieces.add(words);
-                    int pause = silences.getInt(i);
-                    if (pause < 0 || pause > 2200) return;
-                    pauses.add(pause);
                 }
             } catch (Exception ignored) { return; }
             runOnUiThread(() -> {
@@ -206,7 +185,6 @@ public class MainActivity extends Activity {
                 clearBatch(false);
                 batchSession = session;
                 batchPieces = pieces;
-                batchPauses = pauses;
                 batchCursor = 0;
                 batchBaseIndex = startIndex;
                 batchTotal = pieces.size();
@@ -403,24 +381,6 @@ public class MainActivity extends Activity {
                 }
                 @Override public void onDone(String utteranceId) {
                     if (utteranceId != null && utteranceId.startsWith("B-")) {
-                        String[] ids=utteranceId.split("-");
-                        if (ids.length == 3) try {
-                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
-                            runOnUiThread(() -> {
-                                if(batchSession!=session || batchCursor!=pos) return;
-                                int pause=pos<batchPauses.size()?batchPauses.get(pos):0;
-                                if(pause>0 && pos+1<batchTotal && nativeTts!=null) {
-                                    int silence=nativeTts.playSilentUtterance(pause, TextToSpeech.QUEUE_ADD,
-                                        "P-" + session + "-" + pos);
-                                    if(silence!=TextToSpeech.ERROR)return;
-                                }
-                                batchCursor=pos+1;
-                                nativeNext(session);
-                            });
-                        } catch (NumberFormatException ignored) {}
-                        return;
-                    }
-                    if (utteranceId != null && utteranceId.startsWith("P-")) {
                         String[] ids=utteranceId.split("-");
                         if (ids.length == 3) try {
                             int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
