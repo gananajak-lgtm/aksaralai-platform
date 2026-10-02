@@ -322,7 +322,7 @@ test('novel detail layout gives mobile title and synopsis separate readable rows
  assert.match(html,/class="novel-summary"/);
  assert.match(html,/class="controls novel-actions"/);
  assert.match(html,/\.novel-summary\{grid-column:1\/-1;grid-row:2;/);
- assert.match(html,/\.novel-overview \.novel-cover\{grid-column:1;grid-row:1;width:94px;height:125px;/);
+ assert.match(html,/\.novel-overview \.novel-cover\{grid-column:1;grid-row:1;width:94px;height:133px;/);
  assert.doesNotMatch(html,/min-width:170px;height:190px/);
 });
 
