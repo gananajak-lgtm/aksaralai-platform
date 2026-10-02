@@ -422,7 +422,7 @@ test('Android background TTS advances in native onDone without WebView JavaScrip
  assert.match(java,/savedBatchIndex\(String chapter, String signature\)/);
  assert.match(java,/onPause\(\) \{\s*appForeground=false/);
  assert.match(html,/nativeBatchMode=nativeMode&&engine\.batchAvailable/);
- assert.match(html,/engine\.batch\(prepared,pauseDurations,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(html,/AksaralaiNativeBatchFeedback/);
  assert.match(html,/engine\.batchState\(\)/);
 });
@@ -712,7 +712,7 @@ test('playback resume is isolated for three different users sharing one Android 
  // Native background TTS does not read or overwrite the previous account's position.
  assert.match(html,/nativeChapter=accountId\+':'\+chapterId/);
  assert.match(html,/engine\.savedBatchIndex\(nativeChapter,signature\)/);
- assert.match(html,/engine\.batch\(prepared,pauseDurations,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(html,/String\(state\.chapter\)!==nativeChapter/);
  assert.equal((java.match(/chapter\.matches\("\[0-9\]\{1,12\}:\[0-9\]\{1,12\}"\)/g)||[]).length,2);
  assert.match(java,/getString\("progress\." \+ chapter,/);
@@ -729,41 +729,6 @@ test('playback resume is isolated for three different users sharing one Android 
  assert.doesNotMatch(html,/getItem\('aksaralai\.tts\.chapter\.'\+chapterId\)/);
  assert.doesNotMatch(html,/getItem\('aksaralai\.mp3\.position\.'\+chapterId\)/);
 });
-
-test('dialogue-only pauses preserve narration flow in browser and Android native background TTS',()=>{
- const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
- const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
- assert.match(html,/id="tts-pause" aria-label="ระยะพักเสียงเมื่อเปลี่ยนบทพูด"/);
- for(const ms of [0,600,1000,1500,2200])assert.match(html,new RegExp('<option value="'+ms+'">'));
- assert.match(html,/localStorage\.getItem\('aksaralai\.tts\.dialoguePauseMs'\)/);
- assert.match(html,/localStorage\.setItem\('aksaralai\.tts\.dialoguePauseMs',String\(pauseMs\)\)/);
- assert.match(html,/function dialoguePauseAfter\(parts,i,pause\)/);
- assert.match(html,/var delay=\(paragraphEnd\?320:0\)\+dialoguePauseAfter\(parts,index-1,pauseMs\)/);
- assert.match(html,/var pauseDurations=prepared\.map\(function\(_,pos\)\{return dialoguePauseAfter\(parts,batchBase\+pos,pauseMs\);\}\)/);
- assert.match(html,/bridge\.speakBatchWithPauses\(JSON\.stringify\(parts\),JSON\.stringify\(pauses\),speed/);
- assert.match(html,/bridge\.speakBatch\(JSON\.stringify\(parts\),speed,voice,session,String\(chapter\),signature,start\)/);
- assert.match(java,/public void speakBatch\(String json, double speed/);
- assert.match(java,/public void speakBatchWithPauses\(String json, String pauseJson, double speed/);
- assert.match(java,/if \(silences\.length\(\) != arr\.length\(\)\) return/);
- assert.match(java,/if \(pause < 0 \|\| pause > 2200\) return/);
- assert.match(java,/batchPauses = pauses/);
- assert.match(java,/nativeTts\.playSilentUtterance\(pause, TextToSpeech\.QUEUE_ADD/);
- assert.match(java,/utteranceId\.startsWith\("P-"\)/);
- assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
- assert.doesNotMatch(java,/@JavascriptInterface public void setBatchPause/);
-});
-
-test('native TTS maintains compatibility with installed old and new APKs',()=>{
- const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
- const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
- assert.match(html,/batchAvailable:typeof bridge\.speakBatchWithPauses==='function'/);
- assert.match(html,/if\(typeof bridge\.speakBatchWithPauses==='function'\)[\s\S]*?bridge\.speakBatchWithPauses\(JSON\.stringify\(parts\),JSON\.stringify\(pauses\),speed/);
- assert.match(html,/else if\(typeof bridge\.speakBatch==='function'\)[\s\S]*?bridge\.speakBatch\(JSON\.stringify\(parts\),speed,voice,session,String\(chapter\),signature,start\)/);
- assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
- assert.match(java,/@JavascriptInterface public void speakBatchWithPauses\(String json, String pauseJson, double speed, String selected,/);
- assert.match(java,/speakBatchWithPauses\(json, zeros\.toString\(\), speed, selected, session, chapter, signature, startIndex\)/);
-});
-
 
 test('novel cover upload is owner-only, image-validated and readable with novel visibility',async()=>{
  const objects=new Map();
@@ -809,4 +774,20 @@ test('writer UI supports selecting, previewing, removing and displaying real nov
  assert.match(html,/id="remove-cover"/);
  assert.match(html,/method:'DELETE'/);
  assert.match(html,/object-fit:cover/);
+});
+
+test('reader uses stable native background TTS without dialogue pause protocol',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ assert.doesNotMatch(html,/id="tts-pause"/);
+ assert.doesNotMatch(html,/dialoguePauseAfter/);
+ assert.match(html,/batchAvailable:typeof bridge\.speakBatch==='function'/);
+ assert.match(html,/bridge\.speakBatch\(JSON\.stringify\(parts\),speed,voice,session,String\(chapter\),signature,start\)/);
+ assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
+ assert.doesNotMatch(html,/speakBatchWithPauses/);
+ assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
+ assert.doesNotMatch(java,/speakBatchWithPauses/);
+ assert.doesNotMatch(java,/playSilentUtterance/);
+ assert.doesNotMatch(java,/batchPauses/);
+ assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
 });
