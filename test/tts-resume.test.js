@@ -213,35 +213,3 @@ test('three logged-in users do not inherit each others TTS resume position on on
  assert.equal(firstAgain.spoken[0].text.trim(),'บทสอง?');
 });
 
-test('spoken dialogue gets extra breathing room but normal narration retains the old timing',()=>{
- const h=harness(new Map(),new Map());
- const pause=vm.runInNewContext(speechCode+'\ndialoguePauseAfter',h.context);
- const narration=['เขาค่อย ๆ เดินผ่านป่า\n','เขามองไปรอบตัว\n','เงาต้นไม้ทอดยาว\n'];
- assert.equal(pause(narration,0,1000),0);
- assert.equal(pause(narration,1,1000),0);
- const conversation=['เขาหันกลับมาทางประตู\n','“ใครอยู่ตรงนั้น”\n','“ข้าเอง”\n','เขาจึงหันกลับไป\n'];
- assert.equal(pause(conversation,0,1000),1000,'pause before the first dialogue');
- assert.equal(pause(conversation,1,1000),1000,'pause between speakers');
- assert.equal(pause(conversation,2,1000),1000,'pause after the dialogue before narration');
- assert.equal(pause(conversation,1,0),0,'the user may disable extra pauses');
- const sameTurn=['“นี่คือบทพูดที่ยาวมากแต่ยังไม่จบ','และยังพูดต่อ”\n'];
- assert.equal(pause(sameTurn,0,1000),0,'do not mistake a long turn split by the chunker for a new speaker');
-});
-
-test('each speaker change pauses between utterances without modifying visible novel',()=>{
- const h=harness(new Map(),new Map());
- const body='เขาหยุดเดิน\n“เจ้ามาที่นี่ทำไม”\n“ข้ามาตามหาเจ้า”\nเขาถอนหายใจ';
- h.initialize(body,33);
- h.els.get('tts-pause').value='1500';
- h.els.get('tts-pause').onchange();
- h.els.get('speak').onclick();
- h.flush();
- assert.equal(h.spoken[0].text,'เขาหยุดเดิน');
- h.spoken[0].onend();
- h.flush();
- assert.equal(h.spoken[1].text,'เจ้ามาที่นี่ทำไม');
- h.spoken[1].onend();
- h.flush();
- assert.equal(h.spoken[2].text,'ข้ามาตามหาเจ้า');
- assert.ok(h.els.get('reading').innerHTML.includes('“เจ้ามาที่นี่ทำไม”'));
-});
