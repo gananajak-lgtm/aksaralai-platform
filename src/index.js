@@ -28,6 +28,16 @@ const integer=s=>{if(!/^[1-9][0-9]*$/.test(s||''))failure(404,'ไม่พบ�
 function novelData(d){return {title:str(d,'title',1,120),summary:str(d,'summary',0,3000),genre:str(d,'genre',0,40)||'ทั่วไป',cover_color:/^#[\da-fA-F]{6}$/.test(d.cover_color||'')?d.cover_color:'#7453a8'};}
 function chapterData(d){const title=str(d,'title',1,120),body=d?.body;if(typeof body!=='string'||body.length>300000||!body.trim())failure(400,'เนื้อหานิยายไม่ถูกต้องหรือยาวเกิน 300,000 ตัวอักษร');return {title,body};}
 function visibility(d){if(typeof d.published!=='boolean')failure(400,'สถานะเผยแพร่ไม่ถูกต้อง');return d.published?1:0;}
+function coverImageType(bytes,declared){
+ const type=(declared||'').toLowerCase().split(';')[0].trim()==='image/jpg'?'image/jpeg':(declared||'').toLowerCase().split(';')[0].trim();
+ let detected='';
+ if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)detected='image/jpeg';
+ else if(bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)detected='image/png';
+ else if(bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP')detected='image/webp';
+ if(!detected||!['image/jpeg','image/png','image/webp'].includes(type)||type!==detected)failure(400,'รองรับเฉพาะภาพ JPG, PNG หรือ WebP');
+ return detected;
+}
+
 async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
  if(!db)failure(503,'ยังไม่เชื่อมต่อฐานข้อมูล D1');
@@ -226,6 +236,38 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
 });
 <\/script></body></html>`;
   return new Response(documentHtml,{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
+ }
+
+ // Novel covers live in the existing private R2 bucket under a separate prefix.
+ // Public readers may fetch covers only for published novels; draft covers stay author-only.
+ if(m==='GET'&&(x=p.match(/^\/api\/novels\/(\d+)\/cover$/))){
+  const user=await identity(db,req),nid=integer(x[1]);await novel(db,nid,user);
+  if(!env.AUDIO)return new Response(null,{status:404,headers:{'cache-control':'no-store'}});
+  const file=await env.AUDIO.get('covers/'+nid);
+  if(!file)return new Response(null,{status:404,headers:{'cache-control':'no-store'}});
+  const type=file.httpMetadata?.contentType||file.customMetadata?.contentType||'image/jpeg';
+  return new Response(file.body,{status:200,headers:{
+   'content-type':type,'content-length':String(file.size||''),'cache-control':'public, max-age=60, must-revalidate',
+   'x-content-type-options':'nosniff','content-disposition':'inline'
+  }});
+ }
+ if(m==='PUT'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/cover$/))){
+  const user=await author(db,req),nid=integer(x[1]);await own(db,nid,user);
+  if(!env.AUDIO)failure(503,'ยังไม่เปิดใช้งานพื้นที่เก็บไฟล์');
+  const declared=req.headers.get('content-type')||'',length=Number(req.headers.get('content-length')||0);
+  if(length>5*1024*1024)failure(413,'ภาพหน้าปกต้องมีขนาดไม่เกิน 5 MB');
+  const buffer=await req.arrayBuffer();
+  if(buffer.byteLength<32||buffer.byteLength>5*1024*1024)failure(400,'ภาพหน้าปกต้องมีขนาดระหว่าง 32 ไบต์ถึง 5 MB');
+  const bytes=new Uint8Array(buffer),type=coverImageType(bytes,declared);
+  await env.AUDIO.put('covers/'+nid,buffer,{httpMetadata:{contentType:type},customMetadata:{contentType:type}});
+  await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);
+  return reply({ok:true});
+ }
+ if(m==='DELETE'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/cover$/))){
+  const user=await author(db,req),nid=integer(x[1]);await own(db,nid,user);
+  if(env.AUDIO)await env.AUDIO.delete('covers/'+nid);
+  await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);
+  return reply({ok:true});
  }
 
  if(p==='/api/novels'&&m==='GET'){
