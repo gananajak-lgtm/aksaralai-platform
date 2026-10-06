@@ -791,3 +791,39 @@ test('reader uses stable native background TTS without dialogue pause protocol',
  assert.doesNotMatch(java,/batchPauses/);
  assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
 });
+
+test('OpenAI fiction rewrite is admin-only and returns a reviewed proposal without saving',async()=>{
+ const h=harness({OPENAI_API_KEY:'fake-test-key',OPENAI_TTS_ADMIN_USERNAME:'rewriteowner'});
+ assert.equal((await h.api('/register','POST',{username:'rewriteowner',display_name:'Owner',password:'long-password-rewrite',role:'writer'})).status,201);
+ const owner=h.getCookie();
+ const original='อวิ๋นเซิงเดินช้า ๆ ผ่านสายหมอก';
+ assert.equal((await h.api('/admin/rewrite-text','POST',{text:'',instruction:'เกลาภาษา'})).status,400);
+ h.clear();
+ assert.equal((await h.api('/admin/rewrite-text','POST',{text:original,instruction:'เกลาภาษา'})).status,401);
+ assert.equal((await h.api('/register','POST',{username:'rewriteother',display_name:'Other',password:'long-password-rewrite2',role:'writer'})).status,201);
+ assert.equal((await h.api('/admin/rewrite-text','POST',{text:original,instruction:'เกลาภาษา'})).status,403);
+ h.setCookie(owner);
+ const nativeFetch=globalThis.fetch;
+ globalThis.fetch=async(url,opts)=>{
+  assert.equal(url,'https://api.openai.com/v1/chat/completions');
+  const body=JSON.parse(opts.body);
+  assert.equal(body.model,'gpt-4o-mini');
+  assert.ok(body.messages[1].content.includes(original));
+  return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({edited:'อวิ๋นเซิงค่อย ๆ เดินฝ่าสายหมอก',summary:'เกลาประโยคให้ลื่นขึ้น'})}}]}),{status:200,headers:{'content-type':'application/json'}});
+ };
+ try{
+  const out=await h.api('/admin/rewrite-text','POST',{text:original,instruction:'เกลาภาษาให้ลื่นขึ้น'});
+  assert.equal(out.status,200);
+  assert.equal(out.edited,'อวิ๋นเซิงค่อย ๆ เดินฝ่าสายหมอก');
+  assert.match(out.summary,/ลื่น/);
+ }finally{globalThis.fetch=nativeFetch;}
+});
+test('chapter editor exposes OpenAI rewrite preview and requires explicit accept',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="ai-rewrite-button"/);
+ assert.match(html,/id="ai-rewrite-dialog"/);
+ assert.match(html,/id="ai-rewrite-before"/);
+ assert.match(html,/id="ai-rewrite-after"/);
+ assert.match(html,/await api\('\/admin\/rewrite-text','POST'/);
+ assert.match(html,/id="ai-rewrite-accept"/);
+});
