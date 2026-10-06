@@ -86,7 +86,7 @@ test('Android restart does not speak before its canceled queue settles',()=>{
 
 test('onboundary saves speech offset and resume reads from that word, not chapter start',()=>{
  const local=new Map(),session=new Map();
- const h=harness(local,session),body='เรื่องราวตอนต้นที่กำลังอ่านและยังไม่จบประโยค!';
+ const h=harness(local,session),body='เรื่องราวตอนต้นที่กำลังอ่านและยังไม่จบประโยค';
  h.initialize(body,123);
  h.els.get('speak').onclick();h.flush();
  assert.equal(h.spoken[0].text,body);
