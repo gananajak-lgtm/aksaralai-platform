@@ -409,14 +409,15 @@ function expandThaiRepeats(text){
 }
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
 function speechText(s){
- return expandThaiRepeats(s.replace(/[“”„‟«»「」『』"']/g,' ')
-  .replace(/[…⋯]|\.{2,}/g,' ')
-  .replace(/[()\[\]{}]/g,' ')
+ // Expand ๆ before filtering because the repetition mark itself is punctuation.
+ var expanded=expandThaiRepeats(String(s||''));
+ return expanded
   .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
-  // Keep sentence spacing and a pause where the original manuscript has a line break.
-  .replace(/\r?\n+/g,' ')
-  .replace(/[ \t]{2,}/g,' ')
-  .trim());
+  // Send only letters, combining marks, numbers and whitespace to TTS.
+  // Punctuation/symbols become spaces so neighbouring words do not get glued together.
+  .replace(/[^\p{L}\p{M}\p{N}\s]/gu,' ')
+  .replace(/\s+/g,' ')
+  .trim();
 }
 
 // Reader-controlled pronunciation replacements; no manuscript changes or external requests.
@@ -477,7 +478,7 @@ pronAdd.onclick=function(){
  pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
 };
 showPronunciations();
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-phrases-v3']);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-only-v4']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
