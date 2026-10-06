@@ -168,6 +168,17 @@ test('paragraph breaks retain a pause before the next spoken chunk, without sayi
  assert.equal(h.spoken[1].text,'บรรทัดที่สอง');
 });
 
+test('TTS sends letters and numbers only while visible manuscript keeps punctuation',()=>{
+ const h=harness(new Map(),new Map());
+ const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
+ assert.equal(speak('“สวัสดี!” — เขาพูด... (ครั้งที่ 2) #ทดสอบ'),'สวัสดี เขาพูด ครั้งที่ 2 ทดสอบ');
+ assert.equal(speak('อวิ๋นเซิง: ไปไหม?'),'อวิ๋นเซิง ไปไหม');
+ h.initialize('“อวิ๋นเซิง!” — ไปไหม?',77);
+ h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken[0].text,'อวิ๋นเซิง ไปไหม');
+ assert.ok(h.els.get('reading').innerHTML.includes('“อวิ๋นเซิง!” — ไปไหม?'));
+});
+
 test('Thai repetition mark is spoken as repeated word, not as mai yamok',()=>{
  const h=harness(new Map(),new Map());
  const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
@@ -198,7 +209,7 @@ test('three logged-in users do not inherit each others TTS resume position on on
  second.initialize(body,42);
  assert.equal(second.els.get('speak').textContent,'▶ เริ่มฟัง');
  second.els.get('speak').onclick();second.flush();
- assert.equal(second.spoken[0].text,'บทแรก!');
+ assert.equal(second.spoken[0].text,'บทแรก');
  second.spoken[0].onend();second.flush();
  second.spoken[1].onend();second.flush();
  assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.user.2.chapter.42')).index,2);
@@ -206,10 +217,10 @@ test('three logged-in users do not inherit each others TTS resume position on on
  third.initialize(body,42);
  assert.equal(third.els.get('speak').textContent,'▶ เริ่มฟัง');
  third.els.get('speak').onclick();third.flush();
- assert.equal(third.spoken[0].text,'บทแรก!');
+ assert.equal(third.spoken[0].text,'บทแรก');
  const firstAgain=harness(local,session,1);
  firstAgain.initialize(body,42);
  firstAgain.els.get('speak').onclick();firstAgain.flush();
- assert.equal(firstAgain.spoken[0].text.trim(),'บทสอง?');
+ assert.equal(firstAgain.spoken[0].text.trim(),'บทสอง');
 });
 
