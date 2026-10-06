@@ -809,6 +809,54 @@ try{
    document.getElementById('chapter-backup-state').textContent='กู้คืนข้อความจากอุปกรณ์แล้ว กรุณากดบันทึกฉบับร่าง';
  }
 }catch(err){}
+// OpenAI fiction rewrite works on the current selection or mobile editing chunk.
+// It returns a proposal only. The writer must accept it and save the chapter separately.
+(function setupAiRewrite(){
+ var trigger=document.getElementById('ai-rewrite-button'),dialog=document.getElementById('ai-rewrite-dialog');
+ var instruction=document.getElementById('ai-rewrite-instruction'),status=document.getElementById('ai-rewrite-status');
+ var before=document.getElementById('ai-rewrite-before'),after=document.getElementById('ai-rewrite-after');
+ var compare=document.getElementById('ai-rewrite-compare'),summary=document.getElementById('ai-rewrite-summary');
+ var run=document.getElementById('ai-rewrite-run'),accept=document.getElementById('ai-rewrite-accept');
+ var pending=null,busy=false;
+ function reset(){pending=null;compare.hidden=true;accept.hidden=true;before.value='';after.value='';summary.textContent='';status.textContent='';}
+ document.getElementById('ai-rewrite-cancel').onclick=function(){dialog.close();reset();};
+ trigger.onclick=function(){
+  reset();
+  var value=chapterEditor.value,start=chapterEditor.selectionStart,end=chapterEditor.selectionEnd;
+  if(start===end){start=0;end=value.length;}
+  var original=value.slice(start,end);
+  if(!original.trim()){status.textContent='ไม่มีข้อความให้ AI แก้';dialog.showModal();return;}
+  if(original.length>4500){status.textContent='ช่วงนี้ยาวกว่า 4,500 ตัวอักษร กรุณาลากเลือกเฉพาะส่วนที่ต้องการ หรือใช้โหมดแก้ทีละช่วง';dialog.showModal();return;}
+  pending={original:original,start:start,end:end,segment:activeSegment};
+  before.value=original;dialog.showModal();
+ };
+ run.onclick=async function(){
+  if(busy||!pending)return;
+  var ask=instruction.value.trim();
+  if(ask.length<2){status.textContent='กรุณาพิมพ์คำสั่งที่ต้องการให้ AI แก้';return;}
+  if(chapterSegments&&activeSegment!==pending.segment){status.textContent='คุณเปลี่ยนช่วงแล้ว กรุณาเริ่มใหม่';return;}
+  if(chapterEditor.value.slice(pending.start,pending.end)!==pending.original){status.textContent='ต้นฉบับเปลี่ยนแล้ว กรุณาเริ่มใหม่';return;}
+  if(!confirm('ให้ OpenAI แก้ข้อความนี้ตามคำสั่งของคุณ? ระบบยังไม่บันทึกทับจนกว่าจะกดใช้ฉบับ AI'))return;
+  busy=true;run.disabled=true;status.textContent='OpenAI กำลังแก้เนื้อหา...';compare.hidden=true;accept.hidden=true;
+  try{
+   var result=await api('/admin/rewrite-text','POST',{text:pending.original,instruction:ask});
+   if(chapterEditor.value.slice(pending.start,pending.end)!==pending.original)throw Error('ต้นฉบับเปลี่ยนระหว่าง AI ประมวลผล');
+   pending.edited=result.edited;after.value=result.edited;summary.textContent=result.summary?'AI สรุปการแก้: '+result.summary:'';
+   compare.hidden=false;accept.hidden=false;status.textContent='ตรวจฉบับก่อน–หลัง แล้วกดใช้ฉบับ AI หากพอใจ';
+  }catch(e){status.textContent=e.message||'OpenAI แก้เนื้อหาไม่สำเร็จ';}
+  finally{busy=false;run.disabled=false;}
+ };
+ accept.onclick=function(){
+  if(!pending||typeof pending.edited!=='string')return;
+  var current=chapterEditor.value;
+  if(current.slice(pending.start,pending.end)!==pending.original){status.textContent='ต้นฉบับเปลี่ยนแล้ว จึงไม่ใช้ผล AI';return;}
+  chapterEditor.value=current.slice(0,pending.start)+pending.edited+current.slice(pending.end);
+  chapterEditor.dispatchEvent(new Event('input',{bubbles:true}));
+  status.textContent='ใส่ฉบับ AI ในช่องแก้ไขแล้ว อย่าลืมกดบันทึกฉบับร่าง';
+  setTimeout(function(){dialog.close();reset();},500);
+ };
+})();
+
 // The admin-only formatter only ever applies a reviewed, insert-newlines-only proposal
 // to the current text selection or one mobile editing chunk.
 (function setupAdminFormatting(){
