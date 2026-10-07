@@ -492,6 +492,18 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   await run(db,'UPDATE novels SET title=?,summary=?,genre=?,cover_color=?,updated_at=? WHERE id=?',d.title,d.summary,d.genre,d.cover_color,clock(),nid);
   return reply({ok:true});
  }
+ if(m==='DELETE'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)$/))){
+  const user=await author(db,req),nid=integer(x[1]);await own(db,nid,user);
+  const chapterIds=(await rows(db,'SELECT id FROM chapters WHERE novel_id=? ORDER BY position',nid)).map(c=>c.id);
+  await run(db,'DELETE FROM novels WHERE id=?',nid);
+  if(env.AUDIO){
+   try{
+    await env.AUDIO.delete('covers/'+nid);
+    for(const cid of chapterIds)await env.AUDIO.delete('chapters/'+cid+'.mp3');
+   }catch(e){console.error('R2 cleanup after novel delete failed',nid,String(e));}
+  }
+  return reply({ok:true,deleted_chapters:chapterIds.length});
+ }
  if(m==='POST'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/publish$/))){
   const user=await author(db,req),nid=integer(x[1]);await own(db,nid,user);const flag=visibility(await payload(req));
   if(flag&&!(await query(db,'SELECT 1 FROM chapters WHERE novel_id=? AND published=1',nid)))failure(400,'ต้องเผยแพร่อย่างน้อยหนึ่งตอนก่อน');
@@ -508,6 +520,15 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   await own(db,c.novel_id,user);const d=chapterData(await payload(req));
   await run(db,'UPDATE chapters SET title=?,body=? WHERE id=?',d.title,d.body,cid);
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),c.novel_id);return reply({ok:true});
+ }
+ if(m==='DELETE'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT id,novel_id,position FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');
+  await own(db,c.novel_id,user);
+  await run(db,'DELETE FROM chapters WHERE id=?',cid);
+  await run(db,'UPDATE chapters SET position=position-1 WHERE novel_id=? AND position>?',c.novel_id,c.position);
+  await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),c.novel_id);
+  if(env.AUDIO){try{await env.AUDIO.delete('chapters/'+cid+'.mp3');}catch(e){console.error('R2 cleanup after chapter delete failed',cid,String(e));}}
+  return reply({ok:true,novel_id:c.novel_id});
  }
  if(m==='POST'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)\/publish$/))){
   const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT * FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');
