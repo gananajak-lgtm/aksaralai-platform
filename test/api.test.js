@@ -838,8 +838,8 @@ test('writers can delete only their own chapters and novels, with chapter positi
  const c3=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'สาม',body:'เนื้อหา 3'});
  h.clear();
  assert.equal((await h.api('/register','POST',{username:'deleteother',display_name:'Other',password:'long-password-delete2',role:'writer'})).status,201);
- assert.equal((await h.api('/writer/chapters/'+c2.id,'DELETE')).status,403);
- assert.equal((await h.api('/writer/novels/'+book.id,'DELETE')).status,403);
+ assert.equal((await h.api('/writer/chapters/'+c2.id,'DELETE')).status,404);
+ assert.equal((await h.api('/writer/novels/'+book.id,'DELETE')).status,404);
  h.setCookie(owner);
  assert.equal((await h.api('/writer/chapters/'+c2.id,'DELETE')).status,200);
  const afterChapter=await h.api('/novels/'+book.id);
