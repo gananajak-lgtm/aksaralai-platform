@@ -827,3 +827,36 @@ test('chapter editor exposes OpenAI rewrite preview and requires explicit accept
  assert.match(html,/await api\('\/admin\/rewrite-text','POST'/);
  assert.match(html,/id="ai-rewrite-accept"/);
 });
+
+test('writers can delete only their own chapters and novels, with chapter positions compacted',async()=>{
+ const h=harness();
+ assert.equal((await h.api('/register','POST',{username:'deleteowner',display_name:'Owner',password:'long-password-delete1',role:'writer'})).status,201);
+ const owner=h.getCookie();
+ const book=await h.api('/writer/novels','POST',{title:'เรื่องที่จะลบ',summary:'',genre:'ทั่วไป',cover_color:'#7453a8'});
+ const c1=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'หนึ่ง',body:'เนื้อหา 1'});
+ const c2=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'สอง',body:'เนื้อหา 2'});
+ const c3=await h.api('/writer/novels/'+book.id+'/chapters','POST',{title:'สาม',body:'เนื้อหา 3'});
+ h.clear();
+ assert.equal((await h.api('/register','POST',{username:'deleteother',display_name:'Other',password:'long-password-delete2',role:'writer'})).status,201);
+ assert.equal((await h.api('/writer/chapters/'+c2.id,'DELETE')).status,403);
+ assert.equal((await h.api('/writer/novels/'+book.id,'DELETE')).status,403);
+ h.setCookie(owner);
+ assert.equal((await h.api('/writer/chapters/'+c2.id,'DELETE')).status,200);
+ const afterChapter=await h.api('/novels/'+book.id);
+ assert.deepEqual(afterChapter.chapters.map(c=>c.id),[c1.id,c3.id]);
+ assert.deepEqual(afterChapter.chapters.map(c=>c.position),[1,2]);
+ assert.equal((await h.api('/chapters/'+c2.id)).status,404);
+ assert.equal((await h.api('/writer/novels/'+book.id,'DELETE')).status,200);
+ assert.equal((await h.api('/novels/'+book.id)).status,404);
+ assert.equal((await h.api('/chapters/'+c1.id)).status,404);
+ assert.equal((await h.api('/chapters/'+c3.id)).status,404);
+});
+
+test('writer editor exposes guarded delete buttons for chapter and novel',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="delete-novel"/);
+ assert.match(html,/id="delete-chapter"/);
+ assert.match(html,/api\('\/writer\/novels\/\'\+id,'DELETE'\)/);
+ assert.match(html,/api\('\/writer\/chapters\/\'\+id,'DELETE'\)/);
+ assert.match(html,/ไม่สามารถกู้คืนได้/);
+});
