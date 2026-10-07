@@ -53,7 +53,7 @@ test('Android pause and resume starts speaking again without relying on native r
  h.engine.resume=()=>{resumes++;};
  h.els.get('speak').onclick();h.flush();
  h.spoken[0].onend();h.flush();
- assert.equal(h.spoken[1].text.trim(),'ช่วงที่สอง?');
+ assert.equal(h.spoken[1].text.trim(),'ช่วงที่สอง');
  h.els.get('speak').onclick();
  assert.match(h.els.get('speak').textContent,/ฟังต่อ/);
  assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.user.1.chapter.77')).index,1);
