@@ -21,17 +21,17 @@ test('checkpoint survives pagehide and reload, resumes second segment, restart c
  const first=harness(local,session);first.initialize(text,42);
  assert.equal(first.els.get('speak').textContent,'▶ เริ่มฟัง');
  first.els.get('speak').onclick();first.flush();
- assert.equal(first.spoken[0].text,'เสียงแรก!');
+ assert.equal(first.spoken[0].text,'เสียงแรก');
  first.spoken[0].onend();first.flush();
- assert.equal(first.spoken[1].text.trim(),'เสียงที่สอง?');
+ assert.equal(first.spoken[1].text.trim(),'เสียงที่สอง');
  assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.user.1.chapter.42')).index,1);
  first.events.get('pagehide')();first.context.audio.stop();
  const refreshed=harness(local,session);refreshed.initialize(text,42);
  assert.match(refreshed.els.get('speak').textContent,/ฟังต่อจากจุดเดิม/);
  refreshed.els.get('speak').onclick();refreshed.flush();
- assert.equal(refreshed.spoken[0].text.trim(),'เสียงที่สอง?');
+ assert.equal(refreshed.spoken[0].text.trim(),'เสียงที่สอง');
  refreshed.els.get('restart-speech').onclick();refreshed.flush();
- assert.equal(refreshed.spoken[1].text,'เสียงแรก!');
+ assert.equal(refreshed.spoken[1].text,'เสียงแรก');
  assert.equal(JSON.parse(local.get('aksaralai.tts.chapter.user.1.chapter.42')).index,0);
 });
 test('checkpoints remain separate per chapter and reset after content changes',()=>{
@@ -60,7 +60,7 @@ test('Android pause and resume starts speaking again without relying on native r
  const before=h.spoken.length;
  h.els.get('speak').onclick();h.flush();
  assert.equal(h.spoken.length,before+1,'resume must start a new utterance');
- assert.equal(h.spoken.at(-1).text.trim(),'ช่วงที่สอง?');
+ assert.equal(h.spoken.at(-1).text.trim(),'ช่วงที่สอง');
  assert.equal(resumes,0,'native resume must not be required');
  assert.ok(cancels>=2);
  // A canceled utterance completing late must not skip any text.
