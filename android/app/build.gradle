@@ -24,3 +24,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+
+dependencies {
+    implementation 'mobi.cangol.mobile:lame:1.0.1'
+}
