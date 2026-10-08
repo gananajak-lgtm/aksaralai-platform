@@ -222,8 +222,23 @@ test('local AI Voice Studio is visible to authors and uses the local PC, not pai
  assert.match(html,/id="local-ai-voice-studio"[^>]*>/);
  assert.doesNotMatch(html,/id="local-ai-voice-studio"[^>]* hidden>/);
  assert.match(html,/function setupLocalVoiceStudio\(copyFullChapter\)/);
- assert.match(html,/chapterMp3Uploader\(id\);setupLocalVoiceStudio\(joinChapterText\)/);
+ assert.match(html,/chapterMp3Uploader\(id\);setupSystemTtsMp3\(id,joinChapterText\);setupLocalVoiceStudio\(joinChapterText\)/);
  assert.match(html,/id="voice-studio-open" hidden/);
+});
+
+test('Android chapter editor exposes on-device system TTS MP3 creation without OpenAI',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ const gradle=fs.readFileSync(new URL('../android/app/build.gradle',import.meta.url),'utf8');
+ assert.match(html,/id="system-tts-mp3"[^>]*hidden/);
+ assert.match(html,/id="system-tts-file-create"/);
+ assert.match(html,/function setupSystemTtsMp3\(chapterId,copyFullChapter\)/);
+ assert.match(html,/AksaralaiTts\.synthesizeMp3\(JSON\.stringify\(prepared\)/);
+ assert.match(java,/@JavascriptInterface public void synthesizeMp3/);
+ assert.match(java,/nativeTts\.synthesizeToFile/);
+ assert.match(java,/encodeRawToMp3/);
+ assert.match(java,/uploadGeneratedMp3/);
+ assert.match(gradle,/io\.vacco\.jlame:jlame:3\.100\.2/);
 });
 
 test('mobile home uses compact book cards and collapsible accessible navigation',()=>{
