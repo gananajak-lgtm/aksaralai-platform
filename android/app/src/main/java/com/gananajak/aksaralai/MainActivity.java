@@ -46,6 +46,17 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.OutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import io.vacco.libmp3lame.Jlame;
+import io.vacco.libmp3lame.Jlame_global_flags;
 
 public class MainActivity extends Activity {
     // Same Cloudflare-hosted app, users, permissions and R2 backend as the website.
@@ -74,6 +85,23 @@ public class MainActivity extends Activity {
     private boolean appForeground = true;
     private String batchVoice = "";
     private float batchSpeed = 1f;
+
+    // On-device file synthesis state. Android TTS creates short WAV chunks;
+    // we stream their PCM into one temporary raw file and encode it to MP3 locally.
+    private List<String> filePieces = new ArrayList<>();
+    private volatile int fileSession = 0;
+    private volatile int fileCursor = 0;
+    private volatile int fileTotal = 0;
+    private volatile int fileChapterId = 0;
+    private volatile int fileSampleRate = 0;
+    private volatile int fileChannels = 0;
+    private volatile boolean fileBusy = false;
+    private float fileSpeed = 1f;
+    private String fileVoice = "";
+    private String fileName = "";
+    private File fileWorkDir;
+    private File fileRaw;
+    private File fileMp3;
 
     private void reportBatch(int session, int index, String event) {
         if (!appForeground || !trustedTopLevelPage || webView == null) return;
