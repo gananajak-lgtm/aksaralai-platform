@@ -261,7 +261,6 @@ public class MainActivity extends Activity {
         if (flags == null) throw new IOException("Cannot initialize MP3 encoder");
         try {
             if (flags.lame_set_num_channels(channels)) throw new IOException("Unsupported channel count");
-            if (flags.lame_set_in_samplerate(sampleRate) != 0) throw new IOException("Unsupported sample rate");
             if (flags.lame_set_out_samplerate(sampleRate) != 0) throw new IOException("Unsupported MP3 sample rate");
             flags.lame_set_VBR(Jlame.vbr_off);
             flags.lame_set_brate(64);
@@ -485,6 +484,68 @@ public class MainActivity extends Activity {
                 nativeNext(session);
             });
         }
+        @JavascriptInterface public void synthesizeMp3(String json, double speed, String selected,
+                                                        int session, int chapterId) {
+            if (!trustedTopLevelPage || json == null || json.length() > 650000 ||
+                session < 1 || chapterId < 1 || !Double.isFinite(speed) || speed < 0.5 || speed > 2.0) return;
+            final List<String> pieces = new ArrayList<>();
+            try {
+                JSONArray arr = new JSONArray(json);
+                if (arr.length() < 1 || arr.length() > 4000) return;
+                int chars = 0;
+                for (int i = 0; i < arr.length(); i++) {
+                    String part = arr.getString(i);
+                    if (part.length() > TextToSpeech.getMaxSpeechInputLength()) return;
+                    chars += part.length();
+                    if (chars > 350000) return;
+                    if (!part.trim().isEmpty()) pieces.add(part);
+                }
+            } catch (Exception ignored) { return; }
+            if (pieces.isEmpty()) return;
+            runOnUiThread(() -> {
+                if (!trustedTopLevelPage || nativeTts == null || nativeTtsStatus != 1) {
+                    reportFile(session, "error", 0, pieces.size(), "ระบบเสียง Android ยังไม่พร้อม");
+                    return;
+                }
+                if (fileBusy) {
+                    reportFile(session, "error", 0, pieces.size(), "กำลังสร้างไฟล์เสียงอีกงานอยู่ กรุณารอให้เสร็จก่อน");
+                    return;
+                }
+                nativeTts.stop();
+                clearBatch(false);
+                cleanupFileJob();
+                fileBusy = true;
+                fileSession = session;
+                filePieces = pieces;
+                fileCursor = 0;
+                fileTotal = pieces.size();
+                fileChapterId = chapterId;
+                fileSpeed = (float)speed;
+                fileVoice = selected == null ? "" : selected;
+                fileName = "aksaralai-system-chapter-" + chapterId + "-" + System.currentTimeMillis() + ".mp3";
+                fileWorkDir = new File(getCacheDir(), "tts-mp3-" + session);
+                if (!fileWorkDir.exists() && !fileWorkDir.mkdirs()) {
+                    reportFile(session, "error", 0, fileTotal, "สร้างพื้นที่ชั่วคราวสำหรับไฟล์เสียงไม่ได้");
+                    cleanupFileJob();
+                    return;
+                }
+                fileRaw = new File(fileWorkDir, "chapter.pcm");
+                fileMp3 = new File(fileWorkDir, "chapter.mp3");
+                if (!fileVoice.isEmpty()) {
+                    Voice chosen = null;
+                    Set<Voice> all = nativeTts.getVoices();
+                    if (all != null) for (Voice candidate : all) {
+                        if (candidate.getName().equals(fileVoice) && candidate.getLocale() != null &&
+                            "th".equals(candidate.getLocale().getLanguage())) { chosen = candidate; break; }
+                    }
+                    if (chosen != null) nativeTts.setVoice(chosen); else nativeTts.setLanguage(thaiLocale);
+                } else nativeTts.setLanguage(thaiLocale);
+                nativeTts.setSpeechRate(fileSpeed);
+                reportFile(session, "started", 0, fileTotal, "เริ่มสร้างเสียงจากระบบ Android");
+                synthesizeNextFilePart(session);
+            });
+        }
+
         @JavascriptInterface public int status() {
             return trustedTopLevelPage ? nativeTtsStatus : 0;
         }
