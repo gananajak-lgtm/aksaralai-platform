@@ -159,6 +159,258 @@ public class MainActivity extends Activity {
         });
     }
 
+
+    private void reportFile(int session, String event, int done, int total, String detail) {
+        runOnUiThread(() -> {
+            if (webView == null || !trustedTopLevelPage) return;
+            String safeEvent = JSONObject.quote(event == null ? "" : event);
+            String safeDetail = JSONObject.quote(detail == null ? "" : detail);
+            webView.evaluateJavascript(
+                "if(window.AksaralaiNativeFileFeedback)window.AksaralaiNativeFileFeedback(" +
+                session + "," + safeEvent + "," + done + "," + total + "," + safeDetail + ");", null);
+        });
+    }
+
+    private void cleanupFileJob() {
+        fileBusy = false;
+        filePieces.clear();
+        fileSession = 0;
+        fileCursor = 0;
+        fileTotal = 0;
+        fileChapterId = 0;
+        fileSampleRate = 0;
+        fileChannels = 0;
+        if (fileWorkDir != null && fileWorkDir.exists()) {
+            File[] children = fileWorkDir.listFiles();
+            if (children != null) for (File child : children) child.delete();
+            fileWorkDir.delete();
+        }
+        fileWorkDir = null;
+        fileRaw = null;
+        fileMp3 = null;
+    }
+
+    private static int le16(byte[] b, int off) {
+        return (b[off] & 0xff) | ((b[off + 1] & 0xff) << 8);
+    }
+
+    private static long le32(byte[] b, int off) {
+        return ((long)b[off] & 0xff) |
+            (((long)b[off + 1] & 0xff) << 8) |
+            (((long)b[off + 2] & 0xff) << 16) |
+            (((long)b[off + 3] & 0xff) << 24);
+    }
+
+    // Android TTS engines normally emit PCM WAV for synthesizeToFile().
+    // Parse RIFF chunks instead of assuming a fixed 44-byte header.
+    private void appendWavPcm(File wav) throws IOException {
+        try (RandomAccessFile in = new RandomAccessFile(wav, "r")) {
+            byte[] head = new byte[12];
+            if (in.read(head) != 12 ||
+                head[0] != 'R' || head[1] != 'I' || head[2] != 'F' || head[3] != 'F' ||
+                head[8] != 'W' || head[9] != 'A' || head[10] != 'V' || head[11] != 'E') {
+                throw new IOException("TTS engine did not create PCM WAV");
+            }
+            int format = -1, channels = -1, rate = -1, bits = -1;
+            long dataOffset = -1, dataSize = -1;
+            byte[] chunkHead = new byte[8];
+            while (in.getFilePointer() + 8 <= in.length()) {
+                if (in.read(chunkHead) != 8) break;
+                String id = new String(chunkHead, 0, 4, java.nio.charset.StandardCharsets.US_ASCII);
+                long size = le32(chunkHead, 4);
+                long next = in.getFilePointer() + size + (size & 1L);
+                if (size < 0 || next > in.length() + 1) throw new IOException("Invalid WAV chunk");
+                if ("fmt ".equals(id)) {
+                    if (size < 16 || size > 256) throw new IOException("Unsupported WAV format");
+                    byte[] fmt = new byte[(int)size];
+                    in.readFully(fmt);
+                    format = le16(fmt, 0);
+                    channels = le16(fmt, 2);
+                    rate = (int)le32(fmt, 4);
+                    bits = le16(fmt, 14);
+                } else if ("data".equals(id)) {
+                    dataOffset = in.getFilePointer();
+                    dataSize = size;
+                }
+                in.seek(Math.min(next, in.length()));
+            }
+            if (format != 1 || bits != 16 || channels < 1 || channels > 2 || rate < 8000 ||
+                dataOffset < 0 || dataSize < 2) throw new IOException("Unsupported TTS WAV format");
+            if (fileSampleRate == 0) {
+                fileSampleRate = rate;
+                fileChannels = channels;
+            } else if (fileSampleRate != rate || fileChannels != channels) {
+                throw new IOException("TTS audio format changed between chunks");
+            }
+            in.seek(dataOffset);
+            byte[] buffer = new byte[32768];
+            long remaining = dataSize;
+            try (FileOutputStream out = new FileOutputStream(fileRaw, true)) {
+                while (remaining > 0) {
+                    int n = in.read(buffer, 0, (int)Math.min(buffer.length, remaining));
+                    if (n < 0) throw new IOException("Unexpected end of WAV");
+                    out.write(buffer, 0, n);
+                    remaining -= n;
+                }
+            }
+        }
+    }
+
+    private void encodeRawToMp3(File raw, File mp3, int sampleRate, int channels) throws IOException {
+        Jlame_global_flags flags = Jlame.lame_init();
+        if (flags == null) throw new IOException("Cannot initialize MP3 encoder");
+        try {
+            if (flags.lame_set_num_channels(channels)) throw new IOException("Unsupported channel count");
+            if (flags.lame_set_in_samplerate(sampleRate) != 0) throw new IOException("Unsupported sample rate");
+            if (flags.lame_set_out_samplerate(sampleRate) != 0) throw new IOException("Unsupported MP3 sample rate");
+            flags.lame_set_VBR(Jlame.vbr_off);
+            flags.lame_set_brate(64);
+            flags.lame_set_mode(channels == 1 ? Jlame.MONO : Jlame.JOINT_STEREO);
+            flags.lame_set_quality(5);
+            flags.lame_set_write_id3tag_automatic(false);
+            if (Jlame.lame_init_params(flags) < 0) throw new IOException("MP3 encoder setup failed");
+
+            final int samplesPerChannel = 1152;
+            byte[] pcmBytes = new byte[samplesPerChannel * channels * 2];
+            short[] pcm = new short[samplesPerChannel * channels];
+            byte[] mp3Buffer = new byte[16384];
+            try (FileInputStream in = new FileInputStream(raw);
+                 FileOutputStream out = new FileOutputStream(mp3)) {
+                int n;
+                while ((n = in.read(pcmBytes)) > 0) {
+                    int usable = n - (n % (channels * 2));
+                    if (usable <= 0) continue;
+                    ByteBuffer.wrap(pcmBytes, 0, usable).order(ByteOrder.LITTLE_ENDIAN)
+                        .asShortBuffer().get(pcm, 0, usable / 2);
+                    int perChannel = usable / (channels * 2);
+                    int wrote;
+                    if (channels == 2) {
+                        wrote = Jlame.lame_encode_buffer_interleaved(
+                            flags, pcm, perChannel, mp3Buffer, 0, mp3Buffer.length);
+                    } else {
+                        wrote = Jlame.lame_encode_buffer(
+                            flags, pcm, pcm, perChannel, mp3Buffer, 0, mp3Buffer.length);
+                    }
+                    if (wrote < 0) throw new IOException("MP3 encoding failed");
+                    if (wrote > 0) out.write(mp3Buffer, 0, wrote);
+                }
+                int tail = Jlame.lame_encode_flush(flags, mp3Buffer, mp3Buffer.length);
+                if (tail < 0) throw new IOException("MP3 finalization failed");
+                if (tail > 0) out.write(mp3Buffer, 0, tail);
+            }
+        } finally {
+            Jlame.lame_close(flags);
+        }
+    }
+
+    private void saveGeneratedMp3(File source, String filename) throws IOException {
+        if (Build.VERSION.SDK_INT >= 29) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+            values.put(MediaStore.Downloads.MIME_TYPE, "audio/mpeg");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Aksaralai");
+            Uri dest = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (dest == null) throw new IOException("Cannot create download");
+            try (FileInputStream in = new FileInputStream(source);
+                 OutputStream out = getContentResolver().openOutputStream(dest)) {
+                if (out == null) throw new IOException("Cannot open download");
+                byte[] buffer = new byte[65536]; int n;
+                while ((n = in.read(buffer)) >= 0) if (n > 0) out.write(buffer, 0, n);
+            }
+        } else {
+            File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (dir == null) throw new IOException("Downloads unavailable");
+            try (FileInputStream in = new FileInputStream(source);
+                 FileOutputStream out = new FileOutputStream(new File(dir, filename))) {
+                byte[] buffer = new byte[65536]; int n;
+                while ((n = in.read(buffer)) >= 0) if (n > 0) out.write(buffer, 0, n);
+            }
+        }
+    }
+
+    private boolean uploadGeneratedMp3(File source, int chapterId, String cookie) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(HOME + "api/writer/chapters/" + chapterId + "/audio");
+            conn = (HttpURLConnection)url.openConnection();
+            conn.setConnectTimeout(20000);
+            conn.setReadTimeout(45000);
+            conn.setRequestMethod("PUT");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "audio/mpeg");
+            if (cookie != null && !cookie.isEmpty()) conn.setRequestProperty("Cookie", cookie);
+            long length = source.length();
+            if (length < 128 || length > 40L * 1024L * 1024L) return false;
+            conn.setFixedLengthStreamingMode(length);
+            try (FileInputStream in = new FileInputStream(source);
+                 OutputStream out = conn.getOutputStream()) {
+                byte[] buffer = new byte[65536]; int n;
+                while ((n = in.read(buffer)) >= 0) if (n > 0) out.write(buffer, 0, n);
+            }
+            int code = conn.getResponseCode();
+            return code >= 200 && code < 300;
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private void finishFileEncoding(int session) {
+        if (session != fileSession || fileRaw == null || fileMp3 == null) return;
+        final File raw = fileRaw, mp3 = fileMp3;
+        final int sampleRate = fileSampleRate, channels = fileChannels, chapterId = fileChapterId;
+        final String filename = fileName;
+        final String cookie = CookieManager.getInstance().getCookie(HOME);
+        reportFile(session, "encoding", fileTotal, fileTotal, "กำลังเข้ารหัสเป็น MP3");
+        new Thread(() -> {
+            boolean saved = false, uploaded = false;
+            String error = "";
+            try {
+                encodeRawToMp3(raw, mp3, sampleRate, channels);
+                if (mp3.length() < 128) throw new IOException("Empty MP3");
+                if (mp3.length() > 40L * 1024L * 1024L)
+                    throw new IOException("ไฟล์เสียงเกิน 40 MB กรุณาแบ่งตอนให้สั้นลง");
+                saveGeneratedMp3(mp3, filename);
+                saved = true;
+                uploaded = uploadGeneratedMp3(mp3, chapterId, cookie);
+            } catch (Exception e) {
+                error = e.getMessage() == null ? "สร้าง MP3 ไม่สำเร็จ" : e.getMessage();
+            }
+            final boolean doneSaved = saved, doneUploaded = uploaded;
+            final String doneError = error;
+            runOnUiThread(() -> {
+                if (session != fileSession) return;
+                if (!doneError.isEmpty()) {
+                    reportFile(session, "error", fileCursor, fileTotal, doneError);
+                } else if (doneUploaded) {
+                    reportFile(session, "done", fileTotal, fileTotal,
+                        "สร้าง MP3 และอัปโหลดเข้าตอนนี้สำเร็จ · บันทึกสำเนาไว้ใน Downloads/Aksaralai");
+                } else if (doneSaved) {
+                    reportFile(session, "saved", fileTotal, fileTotal,
+                        "สร้าง MP3 สำเร็จและบันทึกใน Downloads/Aksaralai แต่การอัปโหลดอัตโนมัติไม่สำเร็จ");
+                }
+                cleanupFileJob();
+            });
+        }, "AksaralaiMp3Encoder").start();
+    }
+
+    private void synthesizeNextFilePart(int session) {
+        if (session != fileSession || !fileBusy || nativeTts == null || nativeTtsStatus != 1) return;
+        while (fileCursor < fileTotal && filePieces.get(fileCursor).trim().isEmpty()) fileCursor++;
+        if (fileCursor >= fileTotal) {
+            finishFileEncoding(session);
+            return;
+        }
+        File part = new File(fileWorkDir, String.format(Locale.US, "part-%05d.wav", fileCursor));
+        int result = nativeTts.synthesizeToFile(
+            filePieces.get(fileCursor), null, part, "F-" + session + "-" + fileCursor);
+        if (result == TextToSpeech.ERROR) {
+            reportFile(session, "error", fileCursor, fileTotal, "ระบบเสียง Android สร้างไฟล์ไม่ได้");
+            cleanupFileJob();
+        }
+    }
+
     private final class NativeSpeech {
         @JavascriptInterface public String batchState() {
             if (!trustedTopLevelPage) return "{}";
