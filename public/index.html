@@ -382,6 +382,9 @@ async function chapterMp3Uploader(chapterId){
   }catch(e){state.textContent='ตรวจสอบสถานะไฟล์เสียงไม่สำเร็จ';}
  }
  await refreshAudio();
+ document.addEventListener('aksaralai-audio-updated',function(event){
+  if(Number(event.detail&&event.detail.chapterId)===Number(chapterId))refreshAudio();
+ });
  button.onclick=async function(){
   var file=input.files&&input.files[0];
   if(!file){state.textContent='กรุณาเลือกไฟล์ MP3';return;}
