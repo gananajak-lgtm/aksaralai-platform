@@ -299,6 +299,49 @@ document.getElementById('voice-studio-form').addEventListener('submit',async fun
  }catch(e){message.textContent=e.message||'สร้างเสียงไม่สำเร็จ';}
  finally{generate.disabled=false;}
 });
+function setupSystemTtsMp3(chapterId,copyFullChapter){
+ var section=document.getElementById('system-tts-mp3');
+ if(!section||!window.AksaralaiTts||typeof window.AksaralaiTts.synthesizeMp3!=='function')return;
+ section.hidden=false;
+ var voice=document.getElementById('system-tts-file-voice'),speed=document.getElementById('system-tts-file-speed');
+ var button=document.getElementById('system-tts-file-create'),progress=document.getElementById('system-tts-file-progress');
+ var status=document.getElementById('system-tts-file-status'),session=0,busy=false;
+ try{
+  var voices=JSON.parse(window.AksaralaiTts.voices()||'[]');
+  voice.innerHTML='<option value="">เสียงไทยเริ่มต้นของอุปกรณ์</option>'+voices.map(function(v){
+   return '<option value="'+esc(v.voiceURI)+'">'+esc(v.name)+' ('+esc(v.lang)+')</option>';
+  }).join('');
+ }catch(e){}
+ window.AksaralaiNativeFileFeedback=function(id,event,done,total,detail){
+  if(id!==session)return;
+  status.textContent=detail||'กำลังสร้างไฟล์เสียง';
+  if(total>0){progress.hidden=false;progress.max=total;progress.value=Math.max(0,Math.min(total,done));}
+  if(event==='done'||event==='saved'||event==='error'){
+   busy=false;button.disabled=false;
+   if(event==='done'){
+    progress.value=progress.max;toast('สร้างและอัปโหลด MP3 สำเร็จ');
+    document.dispatchEvent(new CustomEvent('aksaralai-audio-updated',{detail:{chapterId:chapterId}}));
+   }else if(event==='saved')toast('สร้าง MP3 สำเร็จ แต่ยังอัปโหลดอัตโนมัติไม่ได้');
+   else toast(detail||'สร้าง MP3 ไม่สำเร็จ');
+  }
+ };
+ button.onclick=function(){
+  if(busy)return;
+  var manuscript=copyFullChapter();
+  if(!manuscript.trim()){status.textContent='ตอนนี้ยังไม่มีเนื้อหาสำหรับสร้างเสียง';return;}
+  var prepared=splitText(manuscript).map(function(part){
+   return pronunciationText(speechText(part),pronunciationEntries());
+  }).filter(function(part){return part.trim();});
+  if(!prepared.length){status.textContent='ไม่มีข้อความที่อ่านออกเสียงได้';return;}
+  if(prepared.length>4000){status.textContent='ตอนนี้ยาวเกินขีดจำกัดการสร้างไฟล์ครั้งเดียว กรุณาแบ่งตอนให้สั้นลง';return;}
+  if(!confirm('สร้าง MP3 จากเสียงระบบ Android ทั้งตอน '+manuscript.length.toLocaleString('th-TH')+' ตัวอักษร? ระหว่างสร้างกรุณาเปิดหน้านี้ไว้จนเสร็จ'))return;
+  session=(session%2000000000)+1;busy=true;button.disabled=true;progress.hidden=false;progress.max=prepared.length;progress.value=0;
+  status.textContent='กำลังเตรียมเสียงระบบ '+prepared.length.toLocaleString('th-TH')+' ช่วง...';
+  try{window.AksaralaiTts.synthesizeMp3(JSON.stringify(prepared),Number(speed.value),voice.value,session,Number(chapterId));}
+  catch(e){busy=false;button.disabled=false;status.textContent='เริ่มสร้างไฟล์เสียงไม่ได้ กรุณาอัปเดตแอป Android เป็นเวอร์ชันล่าสุด';}
+ };
+}
+
 // The local TTS launcher is admin-only, like the paid OpenAI studio.
 // Do not assume the locally installed app is a public service.
 function setupLocalVoiceStudio(copyFullChapter){
