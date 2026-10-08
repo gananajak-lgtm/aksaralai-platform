@@ -709,6 +709,15 @@ public class MainActivity extends Activity {
                 languageSupport == TextToSpeech.LANG_NOT_SUPPORTED ? 0 : 1;
             nativeTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("F-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            if (fileSession==session && fileCursor==pos)
+                                reportFile(session,"progress",pos,fileTotal,"กำลังสร้างเสียงช่วงที่ "+(pos+1)+" / "+fileTotal);
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
                     if (utteranceId != null && utteranceId.startsWith("B-")) {
                         String[] ids=utteranceId.split("-");
                         if (ids.length == 3) try {
@@ -721,6 +730,29 @@ public class MainActivity extends Activity {
                     }
                 }
                 @Override public void onDone(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("F-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(fileSession!=session || fileCursor!=pos || fileWorkDir==null) return;
+                                File part=new File(fileWorkDir,String.format(Locale.US,"part-%05d.wav",pos));
+                                try {
+                                    appendWavPcm(part);
+                                    part.delete();
+                                    fileCursor=pos+1;
+                                    reportFile(session,"progress",fileCursor,fileTotal,
+                                        "สร้างเสียงแล้ว "+fileCursor+" / "+fileTotal+" ช่วง");
+                                    synthesizeNextFilePart(session);
+                                } catch (Exception e) {
+                                    reportFile(session,"error",fileCursor,fileTotal,
+                                        e.getMessage()==null?"อ่านไฟล์เสียงจากระบบไม่ได้":e.getMessage());
+                                    cleanupFileJob();
+                                }
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
                     if (utteranceId != null && utteranceId.startsWith("B-")) {
                         String[] ids=utteranceId.split("-");
                         if (ids.length == 3) try {
@@ -737,6 +769,18 @@ public class MainActivity extends Activity {
                     catch (NumberFormatException ignored) {}
                 }
                 @Override public void onError(String utteranceId) {
+                    if (utteranceId != null && utteranceId.startsWith("F-")) {
+                        String[] ids=utteranceId.split("-");
+                        if (ids.length == 3) try {
+                            int session=Integer.parseInt(ids[1]),pos=Integer.parseInt(ids[2]);
+                            runOnUiThread(() -> {
+                                if(fileSession!=session || fileCursor!=pos) return;
+                                reportFile(session,"error",pos,fileTotal,"ระบบเสียง Android สร้างช่วงนี้ไม่สำเร็จ");
+                                cleanupFileJob();
+                            });
+                        } catch (NumberFormatException ignored) {}
+                        return;
+                    }
                     if (utteranceId != null && utteranceId.startsWith("B-")) {
                         String[] ids=utteranceId.split("-");
                         if (ids.length == 3) try {
@@ -958,6 +1002,8 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() {
         trustedTopLevelPage = false;
         clearBatch(false);
+        if(fileBusy && nativeTts!=null) nativeTts.stop();
+        cleanupFileJob();
         if(uploadCallback!=null){uploadCallback.onReceiveValue(null);uploadCallback=null;}
         if(nativeTts!=null){nativeTts.stop();nativeTts.shutdown();nativeTts=null;}
         if(webView!=null)webView.destroy();
