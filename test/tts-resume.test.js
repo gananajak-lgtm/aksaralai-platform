@@ -168,6 +168,23 @@ test('paragraph breaks retain a pause before the next spoken chunk, without sayi
  assert.equal(h.spoken[1].text,'บรรทัดที่สอง');
 });
 
+test('TTS skips bracketed speaker and narrator labels while keeping their dialogue text',()=>{
+ const h=harness(new Map(),new Map());
+ const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
+ assert.equal(speak('[ลำดวน]\nมาหาใครหรือจ๊ะ'),'มาหาใครหรือจ๊ะ');
+ assert.equal(speak('[คำปัน]\nข้ามาหาพรานสิง'),'ข้ามาหาพรานสิง');
+ assert.equal(speak('[ผู้บรรยาย]\nพรานสิงวางหินลับมีดลงข้างตัว'),'พรานสิงวางหินลับมีดลงข้างตัว');
+ assert.equal(speak('[พรานสิง]\nข้าเอง'),'ข้าเอง');
+ assert.equal(speak('[คำปัน] ข้าชื่อคำปัน มาจากบ้านห้วยหมาก'),'ข้าชื่อคำปัน มาจากบ้านห้วยหมาก');
+});
+test('displayed novel still preserves bracketed speaker labels',()=>{
+ const h=harness(new Map(),new Map());
+ h.initialize('[ลำดวน]\nมาหาใครหรือจ๊ะ',808);
+ h.els.get('speak').onclick();h.flush();
+ assert.equal(h.spoken[0].text,'มาหาใครหรือจ๊ะ');
+ assert.ok(h.els.get('reading').innerHTML.includes('[ลำดวน]'));
+});
+
 test('TTS sends letters and numbers only while visible manuscript keeps punctuation',()=>{
  const h=harness(new Map(),new Map());
  const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
