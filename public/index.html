@@ -455,8 +455,11 @@ function expandThaiRepeats(text){
 }
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
 function speechText(s){
+ // Speaker/narrator labels such as [ลำดวน] or [ผู้บรรยาย] are metadata for the manuscript.
+ // Remove the whole bracketed label before sending text to TTS/MP3 synthesis.
+ var source=String(s||'').replace(/\[[^\]\r\n]{1,120}\]/g,' ');
  // Expand ๆ before filtering because the repetition mark itself is punctuation.
- var expanded=expandThaiRepeats(String(s||''));
+ var expanded=expandThaiRepeats(source);
  return expanded
   .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
   // Send only letters, combining marks, numbers and whitespace to TTS.
@@ -524,7 +527,7 @@ pronAdd.onclick=function(){
  pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
 };
 showPronunciations();
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-only-v4']);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-no-labels-v5']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
