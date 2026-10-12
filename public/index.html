@@ -450,7 +450,7 @@ function expandThaiRepeats(text){
    var pieces=Array.from(segmenter.segment(phrase)).filter(function(item){return item.isWordLike;});
    if(pieces.length)word=pieces[pieces.length-1].segment;
   }
-  return phrase+' '+word;
+  return phrase+word;
  });
 }
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
@@ -527,7 +527,7 @@ pronAdd.onclick=function(){
  pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
 };
 showPronunciations();
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-no-labels-v5']);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-tight-repeat-v6']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
