@@ -123,6 +123,70 @@ public class MainActivity extends Activity {
         batchSignature = "";
     }
 
+    private static final String TIMED_PAUSE_PREFIX = "\uE000P";
+    private static final String TIMED_PAUSE_END = "\uE001";
+
+    private static int timedPauseMs(String token) {
+        if (token == null || !token.startsWith(TIMED_PAUSE_PREFIX) || !token.endsWith(TIMED_PAUSE_END)) return 0;
+        try {
+            int ms = Integer.parseInt(token.substring(TIMED_PAUSE_PREFIX.length(), token.length() - TIMED_PAUSE_END.length()));
+            return ms == 300 || ms == 1000 ? ms : 0;
+        } catch (Exception ignored) { return 0; }
+    }
+
+    private static List<String> expandTimedPiece(String encoded) {
+        List<String> out = new ArrayList<>();
+        if (encoded == null || encoded.isEmpty()) return out;
+        int cursor = 0;
+        while (cursor < encoded.length()) {
+            int start = encoded.indexOf(TIMED_PAUSE_PREFIX, cursor);
+            if (start < 0) {
+                String text = encoded.substring(cursor);
+                if (!text.isEmpty()) out.add(text);
+                break;
+            }
+            if (start > cursor) {
+                String text = encoded.substring(cursor, start);
+                if (!text.isEmpty()) out.add(text);
+            }
+            int end = encoded.indexOf(TIMED_PAUSE_END, start + TIMED_PAUSE_PREFIX.length());
+            if (end < 0) {
+                String text = encoded.substring(start);
+                if (!text.isEmpty()) out.add(text);
+                break;
+            }
+            String token = encoded.substring(start, end + TIMED_PAUSE_END.length());
+            if (timedPauseMs(token) > 0) out.add(token);
+            cursor = end + TIMED_PAUSE_END.length();
+        }
+        return out;
+    }
+
+    private void queueTimedBatchPiece(String encoded, int session, int cursor) {
+        List<String> ops = expandTimedPiece(encoded);
+        if (ops.isEmpty()) {
+            batchCursor++;
+            nativeNext(session);
+            return;
+        }
+        for (int i = 0; i < ops.size(); i++) {
+            String op = ops.get(i);
+            String id = i == ops.size() - 1 ? "B-" + session + "-" + cursor : null;
+            int pause = timedPauseMs(op);
+            int result;
+            if (pause > 0) {
+                result = nativeTts.playSilentUtterance(pause, TextToSpeech.QUEUE_ADD, id);
+            } else {
+                result = nativeTts.speak(op, TextToSpeech.QUEUE_ADD, null, id);
+            }
+            if (result == TextToSpeech.ERROR) {
+                reportBatch(session, batchBaseIndex + cursor, "error");
+                clearBatch(false);
+                return;
+            }
+        }
+    }
+
     private void nativeNext(int session) {
         if (session != batchSession || !trustedTopLevelPage || nativeTtsStatus != 1 || nativeTts == null) return;
         while (batchCursor < batchTotal) {
@@ -137,12 +201,8 @@ public class MainActivity extends Activity {
                         .putString("progress." + batchChapter, progress.toString()).apply();
                 } catch (Exception ignored) {}
             }
-            // Native Android TTS callback drives the next chunk; no JS timers/background throttling.
-            int result = nativeTts.speak(words, TextToSpeech.QUEUE_ADD, null, "B-" + session + "-" + batchCursor);
-            if (result == TextToSpeech.ERROR) {
-                reportBatch(session, batchBaseIndex + batchCursor, "error");
-                clearBatch(false);
-            }
+            // Queue only pauses that exist in the manuscript. No-space text remains one utterance.
+            queueTimedBatchPiece(words, session, batchCursor);
             return;
         }
         reportBatch(session, batchBaseIndex + batchTotal, "done");
@@ -394,6 +454,20 @@ public class MainActivity extends Activity {
         }, "AksaralaiMp3Encoder").start();
     }
 
+    private void appendPcmSilence(int milliseconds) throws IOException {
+        if (milliseconds <= 0 || fileSampleRate <= 0 || fileChannels <= 0 || fileRaw == null) return;
+        long bytes = Math.round((fileSampleRate * fileChannels * 2L) * (milliseconds / 1000.0));
+        bytes -= bytes % (fileChannels * 2L);
+        byte[] zeros = new byte[8192];
+        try (FileOutputStream out = new FileOutputStream(fileRaw, true)) {
+            while (bytes > 0) {
+                int n = (int)Math.min(zeros.length, bytes);
+                out.write(zeros, 0, n);
+                bytes -= n;
+            }
+        }
+    }
+
     private void synthesizeNextFilePart(int session) {
         if (session != fileSession || !fileBusy || nativeTts == null || nativeTtsStatus != 1) return;
         while (fileCursor < fileTotal && filePieces.get(fileCursor).trim().isEmpty()) fileCursor++;
@@ -401,9 +475,26 @@ public class MainActivity extends Activity {
             finishFileEncoding(session);
             return;
         }
+        String currentPiece = filePieces.get(fileCursor);
+        int pause = timedPauseMs(currentPiece);
+        if (pause > 0) {
+            try {
+                // Skip only a leading pause before the first synthesized audio format is known.
+                if (fileSampleRate > 0) appendPcmSilence(pause);
+                fileCursor++;
+                reportFile(session, "progress", fileCursor, fileTotal,
+                    "สร้างเสียงแล้ว " + fileCursor + " / " + fileTotal + " ช่วง");
+                synthesizeNextFilePart(session);
+            } catch (Exception e) {
+                reportFile(session, "error", fileCursor, fileTotal,
+                    e.getMessage() == null ? "เพิ่มช่วงเงียบไม่ได้" : e.getMessage());
+                cleanupFileJob();
+            }
+            return;
+        }
         File part = new File(fileWorkDir, String.format(Locale.US, "part-%05d.wav", fileCursor));
         int result = nativeTts.synthesizeToFile(
-            filePieces.get(fileCursor), null, part, "F-" + session + "-" + fileCursor);
+            currentPiece, null, part, "F-" + session + "-" + fileCursor);
         if (result == TextToSpeech.ERROR) {
             reportFile(session, "error", fileCursor, fileTotal, "ระบบเสียง Android สร้างไฟล์ไม่ได้");
             cleanupFileJob();
@@ -495,10 +586,13 @@ public class MainActivity extends Activity {
                 int chars = 0;
                 for (int i = 0; i < arr.length(); i++) {
                     String part = arr.getString(i);
-                    if (part.length() > TextToSpeech.getMaxSpeechInputLength()) return;
+                    if (part.length() > TextToSpeech.getMaxSpeechInputLength() * 4) return;
                     chars += part.length();
-                    if (chars > 350000) return;
-                    if (!part.trim().isEmpty()) pieces.add(part);
+                    if (chars > 650000) return;
+                    for (String op : expandTimedPiece(part)) {
+                        if (timedPauseMs(op) == 0 && op.length() > TextToSpeech.getMaxSpeechInputLength()) return;
+                        if (!op.isEmpty()) pieces.add(op);
+                    }
                 }
             } catch (Exception ignored) { return; }
             if (pieces.isEmpty()) return;
