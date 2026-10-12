@@ -162,7 +162,7 @@ async function refresh(){var res=await api('/me');user=res.user;updateNav();var 
 async function shelf(){if(!user){app.innerHTML='<div class="empty">กรุณาเข้าสู่ระบบก่อนเปิดชั้นหนังสือ <button class="btn" data-go="auth">เข้าสู่ระบบ</button></div>';return;}var o=await api('/shelf');app.innerHTML='<div class="toolbar"><h1>ชั้นหนังสือของฉัน</h1></div><div class="grid">'+(o.novels.length?o.novels.map(card).join(''):'<div class="empty">ยังไม่มีเรื่องในชั้นหนังสือ</div>')+'</div>';}
 async function showNovel(id){var o=await api('/novels/'+id),n=o.novel;app.innerHTML='<div class="panel novel-detail"><div class="novel-overview">'+coverView(n,'novel-cover')+'<div class="novel-info"><span class="chip">'+esc(n.genre)+'</span><h1>'+esc(n.title)+'</h1><p class="novel-author">เขียนโดย '+esc(o.author)+'</p></div><p class="novel-summary">'+esc(n.summary)+'</p><div class="controls novel-actions"><button class="btn" id="begin">เริ่มอ่าน</button><button class="btn subtle" id="save">'+(o.saved?'✓ อยู่ในชั้นหนังสือ':'＋ เพิ่มเข้าชั้นหนังสือ')+'</button>'+(o.is_owner?'<button class="btn ghost" data-go="edit" data-id="'+n.id+'">จัดการเรื่อง</button>':'')+'</div></div><h2>สารบัญ · '+o.chapters.length+' ตอน</h2><div class="chapter-list">'+(o.chapters.length?o.chapters.map(function(c){return '<div class="chapter-item"><span>'+esc(c.position)+'. '+esc(c.title)+(c.published?'':' · ฉบับร่าง')+'</span><button class="btn subtle" data-go="read" data-id="'+c.id+'">อ่าน</button></div>'}).join(''):'<p class="empty">ยังไม่มีตอนให้อ่าน</p>')+'</div></div>';document.getElementById('begin').onclick=function(){if(o.chapters.length)go('read',o.progress?.chapter_id||o.chapters[0].id);else toast('ยังไม่มีตอนให้อ่าน');};document.getElementById('save').onclick=async function(){if(!user){go('auth');return;}var r=await call(function(){return api('/novels/'+id+'/shelf','POST',{})});if(r)go('novel',id);};}
 function readerOptions(){return '<div class="controls"><button class="btn subtle" id="fontdown">ก−</button><button class="btn subtle" id="fontup">ก＋</button><select id="theme" aria-label="ธีมอ่าน"><option value="light">พื้นขาว</option><option value="sepia">ถนอมสายตา</option><option value="dark">โหมดกลางคืน</option></select></div>';}
-function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><details class="panel" style="margin:10px 0"><summary>🗣️ แก้คำอ่านที่ออกเสียงผิด</summary><p class="small">เพิ่มคำที่อ่านผิดและคำอ่านที่ต้องการ เก็บไว้ในมือถือเครื่องนี้เท่านั้น ไม่แก้เนื้อหานิยายต้นฉบับ</p><div class="controls"><input id="pron-word" maxlength="80" placeholder="คำในนิยาย" aria-label="คำในนิยาย"><input id="pron-sound" maxlength="120" placeholder="ต้องการให้อ่านว่า" aria-label="คำอ่านใหม่"><button class="btn subtle" type="button" id="pron-add">เพิ่มคำอ่าน</button></div><div class="small" id="pron-entries"></div></details><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
+function player(){return '<div class="player"><div class="row between"><strong>🎧 ฟังนิยายด้วยเสียง</strong><span class="small" id="speechstate">พร้อมฟัง</span></div><div class="controls"><button class="btn" id="speak">▶ เริ่มฟัง</button><button class="btn subtle" id="stop">■ หยุด</button><button class="btn ghost" id="restart-speech">↺ เริ่มฟังใหม่</button><select id="speed" aria-label="ความเร็ว"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><select id="voice" aria-label="เลือกเสียง"><option value="">เสียงเริ่มต้นของอุปกรณ์</option></select></div><details class="panel" style="margin:10px 0"><summary>⏱️ ตั้งเวลาหยุดเสียง</summary><p class="small">ปรับทีละ 0.1 วินาที ระบบจำค่าที่เลือกในเครื่องนี้</p><div class="row"><label for="pause-space">เว้นวรรค <output id="pause-space-value">0.3 วินาที</output></label><button type="button" class="btn subtle" id="pause-space-minus">−</button><input id="pause-space" aria-label="ระยะหยุดเมื่อเว้นวรรค" type="range" min="0" max="30" step="1" value="3"><button type="button" class="btn subtle" id="pause-space-plus">＋</button></div><div class="row"><label for="pause-speaker">เปลี่ยนผู้พูด <output id="pause-speaker-value">1.0 วินาที</output></label><button type="button" class="btn subtle" id="pause-speaker-minus">−</button><input id="pause-speaker" aria-label="ระยะหยุดเมื่อเปลี่ยนผู้พูด" type="range" min="0" max="50" step="1" value="10"><button type="button" class="btn subtle" id="pause-speaker-plus">＋</button></div></details><details class="panel" style="margin:10px 0"><summary>🗣️ แก้คำอ่านที่ออกเสียงผิด</summary><p class="small">เพิ่มคำที่อ่านผิดและคำอ่านที่ต้องการ เก็บไว้ในมือถือเครื่องนี้เท่านั้น ไม่แก้เนื้อหานิยายต้นฉบับ</p><div class="controls"><input id="pron-word" maxlength="80" placeholder="คำในนิยาย" aria-label="คำในนิยาย"><input id="pron-sound" maxlength="120" placeholder="ต้องการให้อ่านว่า" aria-label="คำอ่านใหม่"><button class="btn subtle" type="button" id="pron-add">เพิ่มคำอ่าน</button></div><div class="small" id="pron-entries"></div></details><p class="small" id="resume-note" role="status">ระบบจะจำช่วงที่ฟังไว้ในเครื่องนี้ เมื่อกลับมาเปิดตอนเดิมให้กดฟังต่อได้</p><p class="small" id="voice-note">กำลังตรวจสอบเสียงภาษาไทยของอุปกรณ์...</p><p class="small">รายชื่อเสียงที่ต่างกันไม่ได้รับประกันว่าน้ำเสียงจะต่างกัน และอาจหยุดเมื่อปิดหน้าจอ</p></div>';}
 // Split by Thai word boundaries, never at an arbitrary character inside a word.
 // Native HTML audio can request a media session for Android lock-screen playback.
 // Live speechSynthesis stays available as the fallback for chapters without MP3.
@@ -471,13 +471,30 @@ function speechText(s){
 
 // Native Android timing plan. Private-use markers never reach the spoken text:
 // original spaces = 300 ms; speaker labels = 1000 ms. Punctuation never creates a pause.
+function aksaralaiPauseSettings(){
+ var defaults={space:300,speaker:1000};
+ try{var saved=JSON.parse(localStorage.getItem('aksaralai.tts.pause.settings')||'null');if(saved){for(var key of ['space','speaker'])if(Number.isFinite(saved[key]))defaults[key]=Math.max(0,Math.min(key==='space'?3000:5000,Math.round(saved[key]/100)*100));}}catch(e){}
+ return defaults;
+}
+function bindPauseSettings(){
+ var settings=aksaralaiPauseSettings();
+ ['space','speaker'].forEach(function(key){
+  var input=document.getElementById('pause-'+key),output=document.getElementById('pause-'+key+'-value');
+  if(!input||!output)return;
+  function render(){output.textContent=(settings[key]/1000).toFixed(1)+' วินาที';input.value=String(settings[key]/100);}
+  render();
+  function change(value){settings[key]=Math.max(0,Math.min(key==='space'?3000:5000,Math.round(value)*100));render();try{localStorage.setItem('aksaralai.tts.pause.settings',JSON.stringify(settings));}catch(e){}}
+  input.addEventListener('input',function(){change(Number(input.value));});
+  ['minus','plus'].forEach(function(direction){var button=document.getElementById('pause-'+key+'-'+direction);if(button)button.onclick=function(){change(settings[key]/100+(direction==='plus'?1:-1));};});
+ });
+}
 function speechControlText(s){
  var PAUSE='\uE000P',END='\uE001',source=String(s||'').replace(/\r/g,'');
  source=expandThaiRepeats(source).replace(/[\u200b\u200c\u200d\ufeff]/g,'');
- source=source.replace(/\[[^\]\n]{1,120}\]/g,PAUSE+'1000'+END);
+ source=source.replace(/\[[^\]\n]{1,120}\]/g,PAUSE+longPause+END);
  source=source.replace(/[^\p{L}\p{M}\p{N} \t\n\uE000\uE001P0-9]/gu,'');
- source=source.replace(/[ \t]+/g,PAUSE+'300'+END).replace(/\n+/g,PAUSE+'300'+END);
- var p300=PAUSE+'300'+END,p1000=PAUSE+'1000'+END;
+ source=source.replace(/[ \t]+/g,PAUSE+shortPause+END).replace(/\n+/g,PAUSE+shortPause+END);
+ var p300=PAUSE+shortPause+END,p1000=PAUSE+longPause+END;
  source=source.split(p300+p1000).join(p1000).split(p1000+p300).join(p1000);
  while(source.indexOf(p300+p300)>=0)source=source.split(p300+p300).join(p300);
  while(source.indexOf(p1000+p1000)>=0)source=source.split(p1000+p1000).join(p1000);
@@ -526,6 +543,7 @@ function androidSpeechEngine(){
  };
 }
 function initializeAudio(body,chapterId){
+bindPauseSettings();
 var nativeMode=!!window.AksaralaiTts,engine=nativeMode?androidSpeechEngine():window.speechSynthesis,Utterance=nativeMode?function(text){this.text=text;this.lang='th-TH';this.rate=1;this.voice=null;}:window.SpeechSynthesisUtterance;
 var parts=splitText(body),box=document.getElementById('reading'),state=document.getElementById('speechstate'),voice=document.getElementById('voice'),rate=document.getElementById('speed'),button=document.getElementById('speak'),resumeNote=document.getElementById('resume-note'),restartButton=document.getElementById('restart-speech'),index=0,offset=0,active=false,paused=false,ticket=0;
 var accountId=String(user.id),storageKey='aksaralai.tts.chapter.user.'+accountId+'.chapter.'+chapterId, lastListeningKey='aksaralai.tts.last.user.'+accountId, nativeChapter=accountId+':'+chapterId, nativeBatchMode=nativeMode&&engine.batchAvailable,nativeTimedPauseMode=nativeBatchMode&&engine.timedPauseAvailable,batchBase=0;
