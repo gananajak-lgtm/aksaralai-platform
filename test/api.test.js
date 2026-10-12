@@ -809,6 +809,8 @@ test('reader native TTS preserves authored spacing with explicit pause timing',(
  assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
  assert.match(java,/playSilentUtterance\(pause, TextToSpeech\.QUEUE_ADD/);
  assert.match(java,/timedPauseMs/);
+ assert.match(java,/ms >= 100 && ms <= 5000 && ms % 100 == 0/);
+ assert.doesNotMatch(java,/ms == 300 \|\| ms == 1000/);
  assert.match(java,/appendPcmSilence/);
  assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
 });
