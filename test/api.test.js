@@ -798,8 +798,12 @@ test('reader native TTS preserves authored spacing with explicit pause timing',(
  assert.doesNotMatch(html,/id="tts-pause"/);
  assert.match(html,/function speechControlText\(s\)/);
  assert.match(html,/PAUSE='\\uE000P'/);
- assert.match(html,/PAUSE\+'300'/);
- assert.match(html,/PAUSE\+'1000'/);
+ assert.match(html,/PAUSE\+shortPause\+END/);
+ assert.match(html,/PAUSE\+longPause\+END/);
+ assert.match(html,/function aksaralaiPauseSettings\(\)/);
+ assert.match(html,/bindPauseSettings\(\)/);
+ assert.match(html,/id="pause-space"/);
+ assert.match(html,/id="pause-speaker"/);
  assert.match(html,/batchAvailable:typeof bridge\.speakBatch==='function'/);
  assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
  assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
