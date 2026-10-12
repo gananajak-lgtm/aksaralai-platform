@@ -489,6 +489,7 @@ function bindPauseSettings(){
  });
 }
 function speechControlText(s){
+ var settings=aksaralaiPauseSettings(),shortPause=String(settings.space),longPause=String(settings.speaker);
  var PAUSE='\uE000P',END='\uE001',source=String(s||'').replace(/\r/g,'');
  source=expandThaiRepeats(source).replace(/[\u200b\u200c\u200d\ufeff]/g,'');
  source=source.replace(/\[[^\]\n]{1,120}\]/g,PAUSE+longPause+END);
