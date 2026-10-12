@@ -130,7 +130,7 @@ public class MainActivity extends Activity {
         if (token == null || !token.startsWith(TIMED_PAUSE_PREFIX) || !token.endsWith(TIMED_PAUSE_END)) return 0;
         try {
             int ms = Integer.parseInt(token.substring(TIMED_PAUSE_PREFIX.length(), token.length() - TIMED_PAUSE_END.length()));
-            return ms == 300 || ms == 1000 ? ms : 0;
+            return ms >= 100 && ms <= 5000 && ms % 100 == 0 ? ms : 0;
         } catch (Exception ignored) { return 0; }
     }
 
