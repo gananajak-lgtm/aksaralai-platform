@@ -433,7 +433,8 @@ test('Android background TTS advances in native onDone without WebView JavaScrip
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
  assert.match(java,/void nativeNext\(int session\)/);
  assert.match(java,/if\(batchSession!=session \|\| batchCursor!=pos\) return;\s*batchCursor=pos\+1;\s*nativeNext\(session\);/);
- assert.match(java,/nativeTts\.speak\(words, TextToSpeech\.QUEUE_ADD, null, "B-" \+ session/);
+ assert.match(java,/queueTimedBatchPiece\(words, session, batchCursor\)/);
+ assert.match(java,/nativeTts\.playSilentUtterance\(pause, TextToSpeech\.QUEUE_ADD, id\)/);
  assert.match(java,/savedBatchIndex\(String chapter, String signature\)/);
  assert.match(java,/onPause\(\) \{\s*appForeground=false/);
  assert.match(html,/nativeBatchMode=nativeMode&&engine\.batchAvailable/);
