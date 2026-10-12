@@ -330,7 +330,7 @@ function setupSystemTtsMp3(chapterId,copyFullChapter){
   var manuscript=copyFullChapter();
   if(!manuscript.trim()){status.textContent='ตอนนี้ยังไม่มีเนื้อหาสำหรับสร้างเสียง';return;}
   var prepared=splitText(manuscript).map(function(part){
-   return pronunciationText(speechText(part),pronunciationEntries());
+   return pronunciationText(speechControlText(part),pronunciationEntries());
   }).filter(function(part){return part.trim();});
   if(!prepared.length){status.textContent='ไม่มีข้อความที่อ่านออกเสียงได้';return;}
   if(prepared.length>4000){status.textContent='ตอนนี้ยาวเกินขีดจำกัดการสร้างไฟล์ครั้งเดียว กรุณาแบ่งตอนให้สั้นลง';return;}
@@ -482,7 +482,6 @@ function speechControlText(s){
  while(source.indexOf(p300+p300)>=0)source=source.split(p300+p300).join(p300);
  while(source.indexOf(p1000+p1000)>=0)source=source.split(p1000+p1000).join(p1000);
  while(source.indexOf(p300)===0)source=source.slice(p300.length);
- while(source.indexOf(p1000)===0)source=source.slice(p1000.length);
  return source;
 }
 // Reader-controlled pronunciation replacements; no manuscript changes or external requests.
