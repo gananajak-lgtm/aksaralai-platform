@@ -40,8 +40,8 @@ test('adjusted timing is encoded only as private-use pause markers',()=>{
  h.node('pause-space').value='5';h.node('pause-space').handlers.input();
  h.node('pause-speaker').value='15';h.node('pause-speaker').handlers.input();
  const text=h.ctx.speechControlText('สวัสดี โลก [ตัวละคร] พูด');
- assert.ok(text.includes('\\uE000P500\\uE001'));
- assert.ok(text.includes('\\uE000P1500\\uE001'));
+ assert.ok(text.includes('\uE000P500\uE001'));
+ assert.ok(text.includes('\uE000P1500\uE001'));
  assert.ok(!text.includes('P300')&&!text.includes('P1000'));
 });
 test('zero pauses, bounds, and malformed saved settings are safe',()=>{
