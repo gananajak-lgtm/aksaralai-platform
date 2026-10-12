@@ -791,19 +791,20 @@ test('writer UI supports selecting, previewing, removing and displaying real nov
  assert.match(html,/object-fit:cover/);
 });
 
-test('reader uses stable native background TTS without dialogue pause protocol',()=>{
+test('reader native TTS preserves authored spacing with explicit pause timing',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
  assert.doesNotMatch(html,/id="tts-pause"/);
- assert.doesNotMatch(html,/dialoguePauseAfter/);
+ assert.match(html,/function speechControlText\(s\)/);
+ assert.match(html,/PAUSE='\\uE000P'/);
+ assert.match(html,/PAUSE\+'300'/);
+ assert.match(html,/PAUSE\+'1000'/);
  assert.match(html,/batchAvailable:typeof bridge\.speakBatch==='function'/);
- assert.match(html,/bridge\.speakBatch\(JSON\.stringify\(parts\),speed,voice,session,String\(chapter\),signature,start\)/);
  assert.match(html,/engine\.batch\(prepared,speed,voice\.value,current,nativeChapter,signature,batchBase\)/);
- assert.doesNotMatch(html,/speakBatchWithPauses/);
  assert.match(java,/@JavascriptInterface public void speakBatch\(String json, double speed, String selected,/);
- assert.doesNotMatch(java,/speakBatchWithPauses/);
- assert.doesNotMatch(java,/playSilentUtterance/);
- assert.doesNotMatch(java,/batchPauses/);
+ assert.match(java,/playSilentUtterance\(pause, TextToSpeech\.QUEUE_ADD/);
+ assert.match(java,/timedPauseMs/);
+ assert.match(java,/appendPcmSilence/);
  assert.match(java,/batchCursor=pos\+1;\s*nativeNext\(session\)/);
 });
 
