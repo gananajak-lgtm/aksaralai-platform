@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/**'
       - 'public/**'
+      - 'test/**'
       - 'wrangler.toml'
       - 'package.json'
       - '.github/workflows/deploy-cloudflare.yml'
