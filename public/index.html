@@ -484,7 +484,7 @@ function bindPauseSettings(){
   function render(){output.textContent=(settings[key]/1000).toFixed(1)+' วินาที';input.value=String(settings[key]/100);}
   render();
   function change(value){settings[key]=Math.max(0,Math.min(key==='space'?3000:5000,Math.round(value)*100));render();try{localStorage.setItem('aksaralai.tts.pause.settings',JSON.stringify(settings));}catch(e){}}
-  input.addEventListener('input',function(){change(Number(input.value));});
+  if(typeof input.addEventListener==='function')input.addEventListener('input',function(){change(Number(input.value));});
   ['minus','plus'].forEach(function(direction){var button=document.getElementById('pause-'+key+'-'+direction);if(button)button.onclick=function(){change(settings[key]/100+(direction==='plus'?1:-1));};});
  });
 }
