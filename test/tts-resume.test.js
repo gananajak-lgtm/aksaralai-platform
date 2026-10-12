@@ -200,7 +200,7 @@ test('Thai repetition mark is spoken as repeated word, not as mai yamok',()=>{
  const h=harness(new Map(),new Map());
  const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
  assert.equal(speak('ช้าๆ'),'ช้าช้า');
- assert.equal(speak('เบา ๆ'),'เบาเบา');
+ assert.equal(speak('เบา ๆ'),'เบา เบา');
  assert.equal(speak('เดินช้าๆ'),'เดินช้าช้า');
  assert.equal(speak('เดินเร็วๆ'),'เดินเร็วเร็ว');
  assert.equal(speak('พูดเบาๆ ก่อนออกไป'),'พูดเบาเบา ก่อนออกไป');
@@ -209,7 +209,18 @@ test('Thai repetition word is synthesized continuously without an artificial spa
  const h=harness(new Map(),new Map());
  const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
  assert.equal(speak('ไกลๆ'),'ไกลไกล');
- assert.equal(speak('ไกล ๆ'),'ไกลไกล');
+ assert.equal(speak('ไกล ๆ'),'ไกล ไกล');
+});
+
+test('native timing plan preserves only authored spacing and speaker boundaries',()=>{
+ const h=harness(new Map(),new Map());
+ const control=vm.runInNewContext(speechCode+'\nspeechControlText',h.context);
+ const p300='\uE000P300\uE001',p1000='\uE000P1000\uE001';
+ assert.equal(control('ไกลๆ'), 'ไกลไกล');
+ assert.equal(control('ไกล ๆ'), 'ไกล'+p300+'ไกล');
+ assert.equal(control('คำหนึ่ง คำสอง'), 'คำหนึ่ง'+p300+'คำสอง');
+ assert.equal(control('คำหนึ่ง—คำสอง'), 'คำหนึ่งคำสอง');
+ assert.equal(control('[ลำดวน]\nมาหาใครหรือจ๊ะ'), p1000+'มาหาใครหรือจ๊ะ');
 });
 
 test('TTS expands repetition while the displayed original preserves the mark',()=>{
