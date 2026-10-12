@@ -212,6 +212,18 @@ test('Thai repetition word is synthesized continuously without an artificial spa
  assert.equal(speak('ไกล ๆ'),'ไกล ไกล');
 });
 
+test('old Android APK never receives pause control markers as spoken text',()=>{
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/timedPauseAvailable:\(function\(\)\{try\{return typeof bridge\.timingProtocol==='function'&&Number\(bridge\.timingProtocol\(\)\)>=1;/);
+ assert.match(html,/nativeTimedPauseMode=nativeBatchMode&&engine\.timedPauseAvailable/);
+ assert.match(html,/nativeTimedPauseMode\?speechControlText\(raw\):speechText\(raw\)/);
+});
+test('new Android APK advertises timed pause protocol support',()=>{
+ const java=fs.readFileSync(new URL('../android/app/src/main/java/com/gananajak/aksaralai/MainActivity.java',import.meta.url),'utf8');
+ assert.match(java,/@JavascriptInterface public int timingProtocol\(\)/);
+ assert.match(java,/return trustedTopLevelPage \? 1 : 0;/);
+});
+
 test('native timing plan preserves only authored spacing and speaker boundaries',()=>{
  const h=harness(new Map(),new Map());
  const control=vm.runInNewContext(speechCode+'\nspeechControlText',h.context);
