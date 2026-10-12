@@ -199,17 +199,24 @@ test('TTS sends letters and numbers only while visible manuscript keeps punctuat
 test('Thai repetition mark is spoken as repeated word, not as mai yamok',()=>{
  const h=harness(new Map(),new Map());
  const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
- assert.equal(speak('ช้าๆ'),'ช้า ช้า');
- assert.equal(speak('เบา ๆ'),'เบา เบา');
- assert.equal(speak('เดินช้าๆ'),'เดินช้า ช้า');
- assert.equal(speak('เดินเร็วๆ'),'เดินเร็ว เร็ว');
- assert.equal(speak('พูดเบาๆ ก่อนออกไป'),'พูดเบา เบา ก่อนออกไป');
+ assert.equal(speak('ช้าๆ'),'ช้าช้า');
+ assert.equal(speak('เบา ๆ'),'เบาเบา');
+ assert.equal(speak('เดินช้าๆ'),'เดินช้าช้า');
+ assert.equal(speak('เดินเร็วๆ'),'เดินเร็วเร็ว');
+ assert.equal(speak('พูดเบาๆ ก่อนออกไป'),'พูดเบาเบา ก่อนออกไป');
 });
+test('Thai repetition word is synthesized continuously without an artificial space',()=>{
+ const h=harness(new Map(),new Map());
+ const speak=vm.runInNewContext(speechCode+'\nspeechText',h.context);
+ assert.equal(speak('ไกลๆ'),'ไกลไกล');
+ assert.equal(speak('ไกล ๆ'),'ไกลไกล');
+});
+
 test('TTS expands repetition while the displayed original preserves the mark',()=>{
  const h=harness(new Map(),new Map());
  h.initialize('เดินช้าๆ',299);
  h.els.get('speak').onclick();h.flush();
- assert.equal(h.spoken[0].text,'เดินช้า ช้า');
+ assert.equal(h.spoken[0].text,'เดินช้าช้า');
  assert.ok(h.els.get('reading').innerHTML.includes('เดินช้าๆ'));
  assert.ok(!h.spoken[0].onboundary,'changed speech text cannot reuse original offsets');
 });
