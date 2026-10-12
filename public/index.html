@@ -444,31 +444,47 @@ function splitText(s){
 function expandThaiRepeats(text){
  var segmenter;
  try{if(typeof Intl!=='undefined'&&Intl.Segmenter)segmenter=new Intl.Segmenter('th',{granularity:'word'});}catch(e){}
- return text.replace(/([\u0e01-\u0e4e]+)([ \t]*)ๆ/g,function(all,phrase){
+ return text.replace(/([\u0e01-\u0e4e]+)([ \t]*)ๆ/g,function(all,phrase,gap){
   var word=phrase;
   if(segmenter){
    var pieces=Array.from(segmenter.segment(phrase)).filter(function(item){return item.isWordLike;});
    if(pieces.length)word=pieces[pieces.length-1].segment;
   }
-  return phrase+word;
+  return phrase+(gap||'')+word;
  });
 }
 // Keep display text original. Clean punctuation only in the text sent to the voice engine.
 function speechText(s){
  // Speaker/narrator labels such as [ลำดวน] or [ผู้บรรยาย] are metadata for the manuscript.
  // Remove the whole bracketed label before sending text to TTS/MP3 synthesis.
- var source=String(s||'').replace(/\[[^\]\r\n]{1,120}\]/g,' ');
+ var source=String(s||'').replace(/\[[^\]\r\n]{1,120}\]/g,'');
  // Expand ๆ before filtering because the repetition mark itself is punctuation.
  var expanded=expandThaiRepeats(source);
  return expanded
   .replace(/[\u200b\u200c\u200d\ufeff]/g,'')
-  // Send only letters, combining marks, numbers and whitespace to TTS.
-  // Punctuation/symbols become spaces so neighbouring words do not get glued together.
-  .replace(/[^\p{L}\p{M}\p{N}\s]/gu,' ')
-  .replace(/\s+/g,' ')
+  // Remove punctuation/symbols without inventing whitespace.
+  .replace(/[^\p{L}\p{M}\p{N}\s]/gu,'')
+  .replace(/[ \t]+/g,' ')
+  .replace(/\r?\n+/g,' ')
   .trim();
 }
 
+// Native Android timing plan. Private-use markers never reach the spoken text:
+// original spaces = 300 ms; speaker labels = 1000 ms. Punctuation never creates a pause.
+function speechControlText(s){
+ var PAUSE='\uE000P',END='\uE001',source=String(s||'').replace(/\r/g,'');
+ source=expandThaiRepeats(source).replace(/[\u200b\u200c\u200d\ufeff]/g,'');
+ source=source.replace(/\[[^\]\n]{1,120}\]/g,PAUSE+'1000'+END);
+ source=source.replace(/[^\p{L}\p{M}\p{N} \t\n\uE000\uE001P0-9]/gu,'');
+ source=source.replace(/[ \t]+/g,PAUSE+'300'+END).replace(/\n+/g,PAUSE+'300'+END);
+ var p300=PAUSE+'300'+END,p1000=PAUSE+'1000'+END;
+ source=source.split(p300+p1000).join(p1000).split(p1000+p300).join(p1000);
+ while(source.indexOf(p300+p300)>=0)source=source.split(p300+p300).join(p300);
+ while(source.indexOf(p1000+p1000)>=0)source=source.split(p1000+p1000).join(p1000);
+ while(source.indexOf(p300)===0)source=source.slice(p300.length);
+ while(source.indexOf(p1000)===0)source=source.slice(p1000.length);
+ return source;
+}
 // Reader-controlled pronunciation replacements; no manuscript changes or external requests.
 function pronunciationEntries(){
  try{var v=JSON.parse(localStorage.getItem('aksaralai.tts.pronunciations')||'[]');return Array.isArray(v)?v.filter(function(x){return x&&typeof x.word==='string'&&typeof x.sound==='string'&&x.word&&x.sound;}).slice(0,100):[];}catch(e){return [];}
@@ -527,7 +543,7 @@ pronAdd.onclick=function(){
  pronWord.value='';pronSound.value='';showPronunciations();toast('บันทึกคำอ่านแล้ว ใช้ในการอ่านช่วงถัดไป');
 };
 showPronunciations();
-var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-letters-tight-repeat-v6']);
+var signature=JSON.stringify([body.length,body.slice(0,80),body.slice(-80),'thai-spacing-timed-v7']);
 function saved(){try{var v=JSON.parse(localStorage.getItem(storageKey)||sessionStorage.getItem(storageKey)||'null');if(v&&v.signature===signature&&Number.isInteger(v.index)&&v.index>=0&&v.index<parts.length){offset=Number.isInteger(v.offset)&&v.offset>=0&&v.offset<parts[v.index].length?v.offset:0;return v.index;}return 0;}catch(e){return 0;}}
 function checkpoint(){
  var value=JSON.stringify({signature:signature,index:index,offset:offset,chapterId:String(chapterId),at:Date.now()});
@@ -591,7 +607,7 @@ function playFromCheckpoint(){var mp3=document.getElementById('mp3-audio');if(mp
   batchBase=index;
   var prepared=parts.slice(index).map(function(raw,pos){
    if(pos===0&&offset>0)raw=raw.slice(offset);
-   return pronunciationText(speechText(raw),pronunciationEntries());
+   return pronunciationText(speechControlText(raw),pronunciationEntries());
   });
   if(!prepared.length){active=false;index=0;offset=0;status();return;}
   // The complete queue now lives in Android. Its onDone callback starts the next
