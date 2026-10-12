@@ -640,6 +640,10 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public int timingProtocol() {
+            return trustedTopLevelPage ? 1 : 0;
+        }
+
         @JavascriptInterface public int status() {
             return trustedTopLevelPage ? nativeTtsStatus : 0;
         }
