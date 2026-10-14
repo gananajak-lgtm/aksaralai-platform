@@ -45,6 +45,7 @@
 }
 
 
+.chapter-find-panel{border:1px solid var(--line);background:var(--soft);padding:12px;border-radius:13px;margin:10px 0}.chapter-find-panel>label{display:block;font-weight:700;margin-bottom:7px}.chapter-find-row{display:flex;gap:7px;align-items:center;margin-top:7px}.chapter-find-row input{min-width:0;flex:1}.chapter-find-row .btn{flex:0 0 auto;white-space:nowrap}.chapter-find-panel .small{margin:8px 0 0}@media(max-width:640px){.chapter-find-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto}.chapter-find-row input{grid-column:1/-1;width:100%}.chapter-find-row .btn{font-size:13px;padding:8px 10px}}
 .chapter-chunk-toolbar{border:1px solid var(--line);background:var(--soft);padding:12px;border-radius:13px;margin:10px 0}.chapter-chunk-toolbar .small{margin:0 0 8px}.chapter-chunk-toolbar .controls{justify-content:space-between;gap:8px}.chapter-chunk-toolbar button{font-size:13px;padding:8px 10px}.chapter-chunk-toolbar #chapter-chunk-position{margin:0;white-space:nowrap}
 
 /* Novel details: short cover/title row, readable full-width synopsis, actions beneath. */
@@ -709,7 +710,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
 async function editChapter(id){var o=await api('/chapters/'+id),c=o.chapter;chapterForm(c.novel_id,c);}
 function chapterForm(nid,chapter){
 var id=chapter?.id;
-app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-edit-actions" id="chapter-edit-actions"><button type="button" class="btn subtle" id="chapter-edit-all">📝 แก้ไขทั้งตอน</button><button type="button" class="btn subtle" id="chapter-edit-chunks" hidden>🧩 กลับไปแก้ทีละช่วง</button><button type="button" class="btn subtle" id="chapter-replace-all">📋 วางต้นฉบับใหม่ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-clear-all">🗑️ ล้างเนื้อหาทั้งตอน</button><input type="file" accept=".txt,text/plain" id="chapter-import-txt" hidden><button type="button" class="btn ghost" id="chapter-import-button">📂 นำเข้าไฟล์ .txt ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-undo-whole" hidden>↩ คืนค่าก่อนเปลี่ยนทั้งตอน</button></div><p class="small" id="chapter-edit-mode-note">โหมดแก้ไขทีละช่วงช่วยให้มือถือทำงานลื่น · ปุ่มแก้ไขทั้งตอนใช้เลือกทั้งหมดและวางทับได้</p><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><section class="ai-format-area" id="ai-format-section" hidden><div class="controls"><button type="button" class="btn subtle" id="ai-format-button">✨ OpenAI ช่วยจัดย่อหน้า</button><button type="button" class="btn" id="ai-rewrite-button">🤖 OpenAI แก้เนื้อหา</button></div><p class="small" id="ai-format-message" role="status">เลือกข้อความหรือใช้ช่วงที่กำลังแก้ได้ไม่เกิน 4,500 ตัวอักษร · ใช้เครดิต API จริง · ระบบจะแสดงฉบับก่อน–หลังและยังไม่บันทึกทับจนกว่าคุณจะกดยอมรับ</p></section><dialog class="ai-format-dialog" id="ai-rewrite-dialog"><h2>🤖 ให้ OpenAI แก้เนื้อหา</h2><p class="small">สั่งได้ เช่น “เกลาภาษาให้ลื่นขึ้นแต่ห้ามเปลี่ยนเหตุการณ์” หรือ “แก้บทสนทนาให้เป็นธรรมชาติ”</p><label for="ai-rewrite-instruction">คำสั่งแก้ไข</label><textarea id="ai-rewrite-instruction" maxlength="1000" rows="4" placeholder="บอก AI ว่าต้องการแก้อะไร..."></textarea><p class="small" id="ai-rewrite-status" role="status"></p><div class="ai-format-compare" id="ai-rewrite-compare" hidden><div><label for="ai-rewrite-before">ต้นฉบับ</label><textarea id="ai-rewrite-before" readonly></textarea></div><div><label for="ai-rewrite-after">ฉบับ AI</label><textarea id="ai-rewrite-after" readonly></textarea></div></div><p class="small" id="ai-rewrite-summary"></p><div class="controls"><button type="button" class="btn" id="ai-rewrite-run">ให้ AI แก้</button><button type="button" class="btn" id="ai-rewrite-accept" hidden>ใช้ฉบับ AI</button><button type="button" class="btn ghost" id="ai-rewrite-cancel">ปิด</button></div></dialog><dialog class="ai-format-dialog" id="ai-format-preview"><h2>✨ ตรวจทานก่อนใช้การจัดย่อหน้า</h2><p class="small" id="ai-format-breaks"></p><div class="ai-format-compare"><div><label for="ai-format-before">ข้อความเดิม</label><textarea id="ai-format-before" readonly></textarea></div><div><label for="ai-format-after">ข้อความที่ AI เสนอ</label><textarea id="ai-format-after" readonly></textarea></div></div><p class="small">ระบบยืนยันแล้วว่า AI ไม่แก้หรือลบอักขระเดิม แต่คุณควรตรวจการแบ่งย่อหน้าก่อนยอมรับ</p><div class="controls"><button type="button" class="btn" id="ai-format-accept">ใช้การจัดย่อหน้านี้</button><button type="button" class="btn ghost" id="ai-format-cancel">ยกเลิก</button></div></dialog><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📤 ส่งออกต้นฉบับตอนนี้</button><button type="button" class="btn danger" id="delete-chapter">🗑️ ลบตอนนี้</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="system-tts-mp3" style="margin-top:18px" hidden><h2>📱 สร้าง MP3 จากเสียงระบบมือถือ</h2><p class="small">ใช้เสียงภาษาไทยที่ติดตั้งใน Android · ไม่ใช้เครดิต OpenAI · ระบบจะสร้าง MP3 ทั้งตอน บันทึกสำเนาใน Downloads/Aksaralai และพยายามอัปโหลดเข้าตอนนี้ให้อัตโนมัติ</p><label>เสียงระบบ</label><select id="system-tts-file-voice"><option value="">เสียงไทยเริ่มต้นของอุปกรณ์</option></select><label>ความเร็ว</label><select id="system-tts-file-speed"><option value="0.85">ช้า 0.85×</option><option value="1" selected>ปกติ 1×</option><option value="1.1">เร็ว 1.10×</option><option value="1.2">เร็ว 1.20×</option></select><div class="controls"><button type="button" class="btn" id="system-tts-file-create">🎧 สร้าง MP3 ทั้งตอน</button></div><progress id="system-tts-file-progress" value="0" max="1" style="width:100%" hidden></progress><p class="small" id="system-tts-file-status" role="status">เปิดหน้านี้ค้างไว้จนสร้างไฟล์เสร็จ โดยเฉพาะตอนที่มีเนื้อหายาว</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px"><h2>🎙️ สร้างเสียงนิยายด้วย AI Voice Studio บนคอม</h2><p class="small">ใช้โปรแกรม VachanaTTS ตัวเดิมบนคอมพิวเตอร์ ไม่เรียก OpenAI API · เนื้อหาตอนนี้จะไม่ถูกส่งไปยังบริการอื่นโดยอัตโนมัติ</p><div class="controls"><button type="button" class="btn" id="voice-copy-chapter">📋 คัดลอกข้อความทั้งตอน</button><a class="btn subtle" id="voice-open-local" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">🎧 เปิด AI Voice Studio บนคอม ↗</a></div><p class="small" id="voice-local-help" role="status">บนคอม: เปิด START_AI_VOICE_STUDIO.bat → คัดลอกข้อความทั้งตอน → เปิด AI Voice Studio แล้ววางข้อความ → สร้าง MP3 → กลับมาอัปโหลดไฟล์ด้วยปุ่มด้านบน · โปรแกรมต้องเปิดอยู่บนคอมเครื่องเดียวกัน · มือถือไม่สามารถเรียกเซิร์ฟเวอร์ localhost ของคอมได้</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
+app.innerHTML='<div class="panel" style="margin-top:25px"><h1>'+(id?'แก้ไขตอน':'เพิ่มตอนใหม่')+'</h1><form id="chapterform"><label>ชื่อตอน</label><input name="title" required maxlength="120" value="'+esc(chapter?.title||'')+'"><label>เนื้อหานิยาย</label><div class="chapter-edit-actions" id="chapter-edit-actions"><button type="button" class="btn subtle" id="chapter-edit-all">📝 แก้ไขทั้งตอน</button><button type="button" class="btn subtle" id="chapter-edit-chunks" hidden>🧩 กลับไปแก้ทีละช่วง</button><button type="button" class="btn subtle" id="chapter-replace-all">📋 วางต้นฉบับใหม่ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-clear-all">🗑️ ล้างเนื้อหาทั้งตอน</button><input type="file" accept=".txt,text/plain" id="chapter-import-txt" hidden><button type="button" class="btn ghost" id="chapter-import-button">📂 นำเข้าไฟล์ .txt ทั้งตอน</button><button type="button" class="btn ghost" id="chapter-undo-whole" hidden>↩ คืนค่าก่อนเปลี่ยนทั้งตอน</button></div><p class="small" id="chapter-edit-mode-note">โหมดแก้ไขทีละช่วงช่วยให้มือถือทำงานลื่น · ปุ่มแก้ไขทั้งตอนใช้เลือกทั้งหมดและวางทับได้</p><section class="chapter-find-panel" id="chapter-find-panel"><label for="chapter-find-word">🔎 ค้นหาในตอนนี้</label><div class="chapter-find-row"><input type="search" id="chapter-find-word" autocomplete="off" placeholder="พิมพ์คำที่ต้องการหา..."><button type="button" class="btn subtle" id="chapter-find-prev">← ก่อนหน้า</button><button type="button" class="btn subtle" id="chapter-find-next">ถัดไป →</button></div><div class="chapter-find-row"><input type="text" id="chapter-replace-word" autocomplete="off" placeholder="ข้อความใหม่ (ถ้าต้องการแทนที่)"><button type="button" class="btn subtle" id="chapter-replace-current">แทนที่คำนี้</button><button type="button" class="btn ghost" id="chapter-replace-found-all">แทนที่ทั้งหมด</button></div><p class="small" id="chapter-find-status" role="status">พิมพ์คำที่ต้องการ ระบบจะพาไปยังตำแหน่งนั้นทันที</p></section><div class="chapter-chunk-toolbar" id="chapter-chunk-toolbar" hidden><p class="small" id="chapter-chunk-description">แก้ไขทีละช่วงเพื่อให้มือถือพิมพ์ได้ลื่นขึ้น ระบบจะรวมทุกช่วงเป็นตอนเดิมเมื่อบันทึก</p><div class="controls"><button type="button" class="btn subtle" id="chapter-chunk-prev">← ช่วงก่อน</button><span class="small" id="chapter-chunk-position"></span><button type="button" class="btn subtle" id="chapter-chunk-next">ช่วงถัดไป →</button></div></div><textarea name="body" required style="min-height:370px" maxlength="300000"></textarea><section class="ai-format-area" id="ai-format-section" hidden><div class="controls"><button type="button" class="btn subtle" id="ai-format-button">✨ OpenAI ช่วยจัดย่อหน้า</button><button type="button" class="btn" id="ai-rewrite-button">🤖 OpenAI แก้เนื้อหา</button></div><p class="small" id="ai-format-message" role="status">เลือกข้อความหรือใช้ช่วงที่กำลังแก้ได้ไม่เกิน 4,500 ตัวอักษร · ใช้เครดิต API จริง · ระบบจะแสดงฉบับก่อน–หลังและยังไม่บันทึกทับจนกว่าคุณจะกดยอมรับ</p></section><dialog class="ai-format-dialog" id="ai-rewrite-dialog"><h2>🤖 ให้ OpenAI แก้เนื้อหา</h2><p class="small">สั่งได้ เช่น “เกลาภาษาให้ลื่นขึ้นแต่ห้ามเปลี่ยนเหตุการณ์” หรือ “แก้บทสนทนาให้เป็นธรรมชาติ”</p><label for="ai-rewrite-instruction">คำสั่งแก้ไข</label><textarea id="ai-rewrite-instruction" maxlength="1000" rows="4" placeholder="บอก AI ว่าต้องการแก้อะไร..."></textarea><p class="small" id="ai-rewrite-status" role="status"></p><div class="ai-format-compare" id="ai-rewrite-compare" hidden><div><label for="ai-rewrite-before">ต้นฉบับ</label><textarea id="ai-rewrite-before" readonly></textarea></div><div><label for="ai-rewrite-after">ฉบับ AI</label><textarea id="ai-rewrite-after" readonly></textarea></div></div><p class="small" id="ai-rewrite-summary"></p><div class="controls"><button type="button" class="btn" id="ai-rewrite-run">ให้ AI แก้</button><button type="button" class="btn" id="ai-rewrite-accept" hidden>ใช้ฉบับ AI</button><button type="button" class="btn ghost" id="ai-rewrite-cancel">ปิด</button></div></dialog><dialog class="ai-format-dialog" id="ai-format-preview"><h2>✨ ตรวจทานก่อนใช้การจัดย่อหน้า</h2><p class="small" id="ai-format-breaks"></p><div class="ai-format-compare"><div><label for="ai-format-before">ข้อความเดิม</label><textarea id="ai-format-before" readonly></textarea></div><div><label for="ai-format-after">ข้อความที่ AI เสนอ</label><textarea id="ai-format-after" readonly></textarea></div></div><p class="small">ระบบยืนยันแล้วว่า AI ไม่แก้หรือลบอักขระเดิม แต่คุณควรตรวจการแบ่งย่อหน้าก่อนยอมรับ</p><div class="controls"><button type="button" class="btn" id="ai-format-accept">ใช้การจัดย่อหน้านี้</button><button type="button" class="btn ghost" id="ai-format-cancel">ยกเลิก</button></div></dialog><p class="small" id="chapter-counter" role="status">จำนวนตัวอักษร: 0 / 300,000</p><p class="small" id="chapter-backup-state" role="status">ข้อความจะสำรองในอุปกรณ์หลังหยุดพิมพ์ชั่วครู่</p><p class="controls"><button class="btn subtle" type="submit" name="intent" value="draft" id="save-chapter">'+(id&&chapter.published?'บันทึกการแก้ไข':'บันทึกฉบับร่าง')+'</button> <button class="btn" type="submit" name="intent" value="publish" id="save-publish-chapter">บันทึกและเผยแพร่</button> <button type="button" class="btn ghost" data-go="edit" data-id="'+nid+'">กลับไปที่เรื่อง</button>' +(id?'<button type="button" class="btn subtle" id="export-chapter-pdf" hidden>📤 ส่งออกต้นฉบับตอนนี้</button><button type="button" class="btn danger" id="delete-chapter">🗑️ ลบตอนนี้</button>':'')+'</p></form>'+(id?'<section class="panel" id="chapter-mp3-uploader" style="margin-top:18px"><h2>🎧 อัปโหลด MP3 สำหรับฟังเบื้องหลัง</h2><p class="small">ไฟล์ .mp3 ขนาดไม่เกิน 40 MB · เฉพาะสมาชิกที่เข้าสู่ระบบจึงจะฟังได้</p><input type="file" accept=".mp3,audio/mpeg" aria-label="เลือกไฟล์เสียง MP3"><div class="controls"><button type="button" class="btn" data-upload>อัปโหลด MP3</button><button type="button" class="btn subtle" data-remove hidden>ลบไฟล์เสียง</button></div><p class="small" data-audio-status>กำลังตรวจสอบระบบเสียง...</p></section><section class="panel" id="system-tts-mp3" style="margin-top:18px" hidden><h2>📱 สร้าง MP3 จากเสียงระบบมือถือ</h2><p class="small">ใช้เสียงภาษาไทยที่ติดตั้งใน Android · ไม่ใช้เครดิต OpenAI · ระบบจะสร้าง MP3 ทั้งตอน บันทึกสำเนาใน Downloads/Aksaralai และพยายามอัปโหลดเข้าตอนนี้ให้อัตโนมัติ</p><label>เสียงระบบ</label><select id="system-tts-file-voice"><option value="">เสียงไทยเริ่มต้นของอุปกรณ์</option></select><label>ความเร็ว</label><select id="system-tts-file-speed"><option value="0.85">ช้า 0.85×</option><option value="1" selected>ปกติ 1×</option><option value="1.1">เร็ว 1.10×</option><option value="1.2">เร็ว 1.20×</option></select><div class="controls"><button type="button" class="btn" id="system-tts-file-create">🎧 สร้าง MP3 ทั้งตอน</button></div><progress id="system-tts-file-progress" value="0" max="1" style="width:100%" hidden></progress><p class="small" id="system-tts-file-status" role="status">เปิดหน้านี้ค้างไว้จนสร้างไฟล์เสร็จ โดยเฉพาะตอนที่มีเนื้อหายาว</p></section><section class="panel" id="local-ai-voice-studio" style="margin-top:18px"><h2>🎙️ สร้างเสียงนิยายด้วย AI Voice Studio บนคอม</h2><p class="small">ใช้โปรแกรม VachanaTTS ตัวเดิมบนคอมพิวเตอร์ ไม่เรียก OpenAI API · เนื้อหาตอนนี้จะไม่ถูกส่งไปยังบริการอื่นโดยอัตโนมัติ</p><div class="controls"><button type="button" class="btn" id="voice-copy-chapter">📋 คัดลอกข้อความทั้งตอน</button><a class="btn subtle" id="voice-open-local" href="http://127.0.0.1:8765/" target="_blank" rel="noopener noreferrer">🎧 เปิด AI Voice Studio บนคอม ↗</a></div><p class="small" id="voice-local-help" role="status">บนคอม: เปิด START_AI_VOICE_STUDIO.bat → คัดลอกข้อความทั้งตอน → เปิด AI Voice Studio แล้ววางข้อความ → สร้าง MP3 → กลับมาอัปโหลดไฟล์ด้วยปุ่มด้านบน · โปรแกรมต้องเปิดอยู่บนคอมเครื่องเดียวกัน · มือถือไม่สามารถเรียกเซิร์ฟเวอร์ localhost ของคอมได้</p></section>':'')+(id&&chapter.published?'<p class="small">ตอนนี้เผยแพร่อยู่แล้ว กดบันทึกและเผยแพร่เพื่อบันทึกการแก้ไขโดยคงสถานะเผยแพร่ไว้</p><button id="chapterpublish" class="btn danger">ปิดเผยแพร่ตอน</button>':'')+'</div>';
 var chapterEditor=document.querySelector('#chapterform textarea[name="body"]'),chapterCounter=document.getElementById('chapter-counter');
 var chapterTitle=document.querySelector('#chapterform input[name="title"]');
 var startingBody=chapter?.body||'',chapterSegments=null,activeSegment=0,chapterLength=startingBody.length;
@@ -788,6 +789,118 @@ function showSegment(index){
 }
 document.getElementById('chapter-chunk-prev').onclick=function(){showSegment(activeSegment-1);};
 document.getElementById('chapter-chunk-next').onclick=function(){showSegment(activeSegment+1);};
+
+// Fast full-chapter literal search that also understands the mobile segmented editor.
+var findWord=document.getElementById('chapter-find-word'),replaceWord=document.getElementById('chapter-replace-word');
+var findStatus=document.getElementById('chapter-find-status'),findMatches=[],findIndex=-1,findTimer=null;
+function normalizeFind(value){return String(value||'').toLocaleLowerCase('th-TH');}
+function currentGlobalCaret(){
+ if(!chapterSegments)return chapterEditor.selectionEnd||0;
+ chapterSegments[activeSegment]=chapterEditor.value;
+ var base=0;for(var i=0;i<activeSegment;i++)base+=chapterSegments[i].length;
+ return base+(chapterEditor.selectionEnd||0);
+}
+function rebuildFindMatches(){
+ var query=findWord.value;
+ findMatches=[];findIndex=-1;
+ if(!query){findStatus.textContent='พิมพ์คำที่ต้องการ ระบบจะพาไปยังตำแหน่งนั้นทันที';return false;}
+ var text=joinChapterText(),hay=normalizeFind(text),needle=normalizeFind(query),from=0;
+ while((from=hay.indexOf(needle,from))!==-1&&findMatches.length<10000){
+  findMatches.push({start:from,end:from+query.length});
+  from+=Math.max(1,query.length);
+ }
+ if(!findMatches.length){findStatus.textContent='ไม่พบ “'+query+'” ในตอนนี้';return false;}
+ return true;
+}
+function jumpToFound(position){
+ if(!findMatches.length)return;
+ findIndex=(position+findMatches.length)%findMatches.length;
+ var match=findMatches[findIndex],full=joinChapterText(),localStart=match.start,localEnd=match.end;
+ if(chapterSegments){
+  var base=0,target=-1;
+  for(var i=0;i<chapterSegments.length;i++){
+   var end=base+chapterSegments[i].length;
+   if(match.start>=base&&match.end<=end){target=i;localStart=match.start-base;localEnd=match.end-base;break;}
+   base=end;
+  }
+  // A rare search term can cross an automatic 4,500-character boundary.
+  // Show the whole chapter only in that case so the exact match can still be edited.
+  if(target<0){wholeEditMode=true;setChapterText(full);localStart=match.start;localEnd=match.end;}
+  else if(target!==activeSegment)showSegment(target);
+ }
+ chapterEditor.focus();
+ chapterEditor.setSelectionRange(localStart,localEnd);
+ if(chapterEditor.value.length){
+  chapterEditor.scrollTop=Math.max(0,chapterEditor.scrollHeight*(localStart/chapterEditor.value.length)-chapterEditor.clientHeight*0.35);
+ }
+ findStatus.textContent='พบ '+findMatches.length.toLocaleString('th-TH')+' จุด · กำลังดูจุดที่ '+(findIndex+1).toLocaleString('th-TH')+' / '+findMatches.length.toLocaleString('th-TH');
+}
+function findFromCaret(direction){
+ if(!rebuildFindMatches())return;
+ var caret=currentGlobalCaret(),pick=-1;
+ if(direction>0){
+  pick=findMatches.findIndex(function(m){return m.start>=caret;});
+  if(pick<0)pick=0;
+ }else{
+  for(var i=findMatches.length-1;i>=0;i--)if(findMatches[i].end<=caret){pick=i;break;}
+  if(pick<0)pick=findMatches.length-1;
+ }
+ jumpToFound(pick);
+}
+findWord.addEventListener('input',function(){
+ clearTimeout(findTimer);
+ findTimer=setTimeout(function(){
+  if(!rebuildFindMatches())return;
+  var caret=currentGlobalCaret(),pick=findMatches.findIndex(function(m){return m.start>=caret;});
+  jumpToFound(pick<0?0:pick);
+ },160);
+});
+findWord.addEventListener('keydown',function(e){
+ if(e.key==='Enter'){e.preventDefault();findFromCaret(e.shiftKey?-1:1);}
+});
+document.getElementById('chapter-find-next').onclick=function(){
+ if(!findMatches.length||normalizeFind(findWord.value)!==normalizeFind(joinChapterText().slice(findMatches[Math.max(0,findIndex)]?.start||0,findMatches[Math.max(0,findIndex)]?.end||0))){
+  if(!rebuildFindMatches())return;
+ }
+ jumpToFound(findIndex+1);
+};
+document.getElementById('chapter-find-prev').onclick=function(){
+ if(!findMatches.length){if(!rebuildFindMatches())return;}
+ jumpToFound(findIndex-1);
+};
+document.getElementById('chapter-replace-current').onclick=function(){
+ if(!rebuildFindMatches())return;
+ var query=findWord.value,replacement=replaceWord.value;
+ var selStart=currentGlobalCaret(),chosen=-1;
+ // Prefer the currently highlighted occurrence.
+ for(var i=0;i<findMatches.length;i++){
+  if(findMatches[i].end===selStart){chosen=i;break;}
+ }
+ if(chosen<0)chosen=findIndex>=0?findIndex:0;
+ var m=findMatches[chosen],full=joinChapterText();
+ if(normalizeFind(full.slice(m.start,m.end))!==normalizeFind(query)){rebuildFindMatches();return;}
+ var next=full.slice(0,m.start)+replacement+full.slice(m.end);
+ setChapterText(next);scheduleBackup();clearTimeout(backupTimer);saveBackup();
+ findStatus.textContent='แทนที่ 1 จุดแล้ว · ยังไม่ได้บันทึกลงเซิร์ฟเวอร์';
+ if(rebuildFindMatches()){
+  var nextPick=findMatches.findIndex(function(x){return x.start>=m.start+replacement.length;});
+  jumpToFound(nextPick<0?0:nextPick);
+ }
+};
+document.getElementById('chapter-replace-found-all').onclick=function(){
+ if(!rebuildFindMatches())return;
+ var query=findWord.value,replacement=replaceWord.value,count=findMatches.length,full=joinChapterText();
+ if(!confirm('แทนที่ “'+query+'” ทั้งหมด '+count.toLocaleString('th-TH')+' จุดด้วย “'+replacement+'” หรือไม่? ระบบจะยังไม่บันทึกจนกว่าจะกดบันทึกตอน'))return;
+ previousWholeReplacement=full;undoWholeButton.hidden=false;
+ for(var i=findMatches.length-1;i>=0;i--){
+  var m=findMatches[i];full=full.slice(0,m.start)+replacement+full.slice(m.end);
+ }
+ setChapterText(full);scheduleBackup();clearTimeout(backupTimer);saveBackup();
+ rebuildFindMatches();
+ findStatus.textContent='แทนที่ทั้งหมด '+count.toLocaleString('th-TH')+' จุดแล้ว · ตรวจทานแล้วกดบันทึกตอนเมื่อพร้อม';
+ toast('แทนที่ทั้งหมดแล้ว '+count.toLocaleString('th-TH')+' จุด');
+};
+
 chapterEditor.addEventListener('input',function(){
  if(chapterSegments){
   var old=chapterSegments[activeSegment].length;
