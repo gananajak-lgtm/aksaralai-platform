@@ -792,7 +792,7 @@ document.getElementById('chapter-chunk-next').onclick=function(){showSegment(act
 
 // Fast full-chapter literal search that also understands the mobile segmented editor.
 var findWord=document.getElementById('chapter-find-word');
-var findStatus=document.getElementById('chapter-find-status'),findMatches=[],findIndex=-1,findTimer=null;
+var findStatus=document.getElementById('chapter-find-status'),findMatches=[],findIndex=-1,findTimer=null,findComposing=false;
 function normalizeFind(value){return String(value||'').toLocaleLowerCase('th-TH');}
 function currentGlobalCaret(){
  if(!chapterSegments)return chapterEditor.selectionEnd||0;
@@ -847,16 +847,24 @@ function findFromCaret(direction){
  }
  jumpToFound(pick);
 }
-findWord.addEventListener('input',function(){
+function scheduleFindAfterTyping(){
  clearTimeout(findTimer);
+ if(findComposing)return;
+ findStatus.textContent=findWord.value?'กำลังรอให้พิมพ์จบ...':'พิมพ์คำที่ต้องการ ระบบจะพาไปยังคำนั้นและเลือกข้อความไว้ให้ คุณพิมพ์แก้เองต่อได้ทันที';
  findTimer=setTimeout(function(){
+  if(findComposing)return;
   if(!rebuildFindMatches())return;
   var caret=currentGlobalCaret(),pick=findMatches.findIndex(function(m){return m.start>=caret;});
   jumpToFound(pick<0?0:pick);
- },160);
-});
+ },800);
+}
+findWord.addEventListener('compositionstart',function(){findComposing=true;clearTimeout(findTimer);});
+findWord.addEventListener('compositionend',function(){findComposing=false;scheduleFindAfterTyping();});
+findWord.addEventListener('input',function(){scheduleFindAfterTyping();});
 findWord.addEventListener('keydown',function(e){
- if(e.key==='Enter'){e.preventDefault();findFromCaret(e.shiftKey?-1:1);}
+ if(e.key==='Enter'){
+  e.preventDefault();clearTimeout(findTimer);findComposing=false;findFromCaret(e.shiftKey?-1:1);
+ }
 });
 document.getElementById('chapter-find-next').onclick=function(){
  if(!findMatches.length||normalizeFind(findWord.value)!==normalizeFind(joinChapterText().slice(findMatches[Math.max(0,findIndex)]?.start||0,findMatches[Math.max(0,findIndex)]?.end||0))){
