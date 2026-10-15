@@ -576,7 +576,7 @@ index=saved();
 if(nativeBatchMode)index=Math.max(index,Math.min(parts.length-1,engine.savedBatchIndex(nativeChapter,signature)));
 box.innerHTML=parts.map(function(text,i){return '<span data-segment="'+i+'">'+esc(text)+'</span>'}).join('');
 // Show an inline action at the tapped passage, avoiding Android text-selection menus.
-var inlineListen=document.createElement('button');
+var inlineListen=typeof document.createElement==='function'?document.createElement('button'):{style:{},textContent:'',onclick:null};
 inlineListen.type='button';inlineListen.className='btn';inlineListen.textContent='▶ ฟังจากตรงนี้';
 inlineListen.style.cssText='display:none;position:sticky;bottom:12px;z-index:10;margin:10px 0;min-height:44px;';
 inlineListen.onclick=function(){if(selectionButton&&typeof selectionButton.onclick==='function')selectionButton.onclick();};
