@@ -575,7 +575,12 @@ function saveBeforeExit(){if(active||index>0)checkpoint();}
 index=saved();
 if(nativeBatchMode)index=Math.max(index,Math.min(parts.length-1,engine.savedBatchIndex(nativeChapter,signature)));
 box.innerHTML=parts.map(function(text,i){return '<span data-segment="'+i+'">'+esc(text)+'</span>'}).join('');
-// Selecting a passage is independent of the persisted playback position.
+// Show an inline action at the tapped passage, avoiding Android text-selection menus.
+var inlineListen=document.createElement('button');
+inlineListen.type='button';inlineListen.className='btn';inlineListen.textContent='▶ ฟังจากตรงนี้';
+inlineListen.style.cssText='display:none;position:sticky;bottom:12px;z-index:10;margin:10px 0;min-height:44px;';
+inlineListen.onclick=function(){if(selectionButton&&typeof selectionButton.onclick==='function')selectionButton.onclick();};
+if(typeof box.insertAdjacentElement==='function')box.insertAdjacentElement('afterend',inlineListen);
 if(typeof box.addEventListener==='function')box.addEventListener('click',function(event){
  var target=event.target&&event.target.closest?event.target.closest('[data-segment]'):null;
  if(!target||!box.contains(target))return;
@@ -584,9 +589,10 @@ if(typeof box.addEventListener==='function')box.addEventListener('click',functio
  selectedIndex=chosen;
  box.querySelectorAll('.listen-selected').forEach(function(el){el.classList.remove('listen-selected');});
  target.classList.add('listen-selected');
- if(!selectionButton)return;
- selectionButton.disabled=false;
- selectionButton.textContent='▶ ฟังจากช่วงที่ '+(chosen+1);
+ if(selectionButton){selectionButton.disabled=false;selectionButton.textContent='▶ ฟังจากช่วงที่ '+(chosen+1);}
+ inlineListen.style.display='inline-block';
+ inlineListen.textContent='▶ ฟังจากช่วงที่ '+(chosen+1);
+ if(typeof target.insertAdjacentElement==='function')target.insertAdjacentElement('afterend',inlineListen);
 });
 if(!engine||!Utterance){button.disabled=true;restartButton.disabled=true;state.textContent='อุปกรณ์นี้ไม่รองรับการอ่านเสียง';return;}
 if(nativeMode){
