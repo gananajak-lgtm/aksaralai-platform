@@ -576,7 +576,7 @@ index=saved();
 if(nativeBatchMode)index=Math.max(index,Math.min(parts.length-1,engine.savedBatchIndex(nativeChapter,signature)));
 box.innerHTML=parts.map(function(text,i){return '<span data-segment="'+i+'">'+esc(text)+'</span>'}).join('');
 // Selecting a passage is independent of the persisted playback position.
-box.addEventListener('click',function(event){
+if(typeof box.addEventListener==='function')box.addEventListener('click',function(event){
  var target=event.target&&event.target.closest?event.target.closest('[data-segment]'):null;
  if(!target||!box.contains(target))return;
  var chosen=Number(target.getAttribute('data-segment'));
@@ -584,6 +584,7 @@ box.addEventListener('click',function(event){
  selectedIndex=chosen;
  box.querySelectorAll('.listen-selected').forEach(function(el){el.classList.remove('listen-selected');});
  target.classList.add('listen-selected');
+ if(!selectionButton)return;
  selectionButton.disabled=false;
  selectionButton.textContent='▶ ฟังจากช่วงที่ '+(chosen+1);
 });
@@ -674,7 +675,7 @@ button.onclick=function(){
 };
 document.getElementById('stop').onclick=function(){checkpoint();ticket++;engine.cancel();active=false;paused=false;status();};
 restartButton.onclick=function(){index=0;offset=0;clearCheckpoint();playFromCheckpoint();};
-selectionButton.onclick=function(){
+if(selectionButton)selectionButton.onclick=function(){
  if(selectedIndex<0||selectedIndex>=parts.length)return;
  ticket++;engine.cancel();active=false;paused=false;
  index=selectedIndex;offset=0;checkpoint();playFromCheckpoint();
