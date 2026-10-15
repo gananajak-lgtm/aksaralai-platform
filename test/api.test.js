@@ -268,18 +268,16 @@ test('long chapter editing preserves all paragraph breaks and leading/trailing w
  assert.equal((await h.api('/writer/chapters/'+c.id,'PUT',{title:'ตอนแก้ไข',body:'   \n   '})).status,400);
 });
 
-test('mobile long-chapter editor uses bounded editable segments and local draft recovery',()=>{
+test('mobile long-chapter editor keeps full text editable and draft recovery',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
- assert.match(html,/function splitChapterText\(text\)/);
- assert.match(html,/max=4500/);
- assert.match(html,/chapterSegments\.join\(''\)/);
+ assert.match(html,/function setChapterText\(text\)/);
+ assert.match(html,/chapterEditor\.maxLength=300000;chapterEditor\.value=text/);
+ assert.match(html,/chapterSegments=null;wholeEditMode=true/);
  assert.match(html,/d\.body=joinChapterText\(\)/);
- assert.match(html,/chapterEditor\.value=chapterSegments\[0\]/);
  assert.match(html,/backupTimer=setTimeout\(saveBackup,2500\)/);
  assert.match(html,/confirm\('พบข้อความแก้ไขที่ยังไม่ได้บันทึก/);
- assert.doesNotMatch(html,/<textarea name="body" required style="min-height:370px" maxlength="300000">\'\+esc\(chapter\?\.body/);
+ assert.doesNotMatch(html,/chapterEditor\.value=chapterSegments\[0\]/);
 });
-
 test('manuscript print export is admin-only, retains Thai manuscript and escapes HTML',async()=>{
  const h=harness({OPENAI_TTS_ADMIN_USERNAME:'pdf_owner'});
  assert.equal((await h.api('/register','POST',{username:'pdf_owner',display_name:'เจ้าของงาน',password:'long-password-pdf',role:'writer'})).status,201);
@@ -633,18 +631,15 @@ test('format export menu is visible only after the existing admin authorization'
  assert.match(html,/if\(!button\.isConnected\|\|!permission\.enabled\)return/);
 });
 
-test('whole chapter edit actions preserve the existing segmented mode and allow safe replace/clear/import',()=>{
+test('whole chapter editing supports safe replace, clear, import and undo without segmented mode',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
- assert.match(html,/id="chapter-edit-all"/);
- assert.match(html,/id="chapter-edit-chunks" hidden/);
+ assert.doesNotMatch(html,/id="chapter-edit-all"/);
+ assert.doesNotMatch(html,/id="chapter-edit-chunks"/);
  assert.match(html,/id="chapter-replace-all"/);
  assert.match(html,/id="chapter-clear-all"/);
  assert.match(html,/id="chapter-import-txt"/);
  assert.match(html,/id="chapter-undo-whole" hidden/);
- assert.match(html,/wholeEditMode=true;\s*setChapterText\(full\)/);
- assert.match(html,/wholeEditMode=false;\s*setChapterText\(full\)/);
- assert.match(html,/if\(!wholeEditMode&&window\.matchMedia\('\(max-width:640px\)'\)\.matches&&text\.length>12000\)/);
- assert.match(html,/if\(!wholeEditMode&&chapterLength>12000&&window\.matchMedia/);
+ assert.match(html,/chapterEditor\.maxLength=300000;chapterEditor\.value=text/);
  assert.match(html,/var old=joinChapterText\(\)/);
  assert.match(html,/previousWholeReplacement=old/);
  assert.match(html,/setChapterText\(nextText\)/);
@@ -657,7 +652,6 @@ test('whole chapter edit actions preserve the existing segmented mode and allow 
  assert.match(html,/d\.body=joinChapterText\(\)/);
  assert.match(html,/if\(!d\.body\.trim\(\)\)\{toast\('กรุณากรอกเนื้อหานิยาย'\)/);
 });
-
 test('SPA browser Back follows history and Home exits without logging out',()=>{
  const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  assert.match(html,/history\.pushState\(\{aksaralai:true,route:route,id:id\|\|null,depth:historyDepth\}/);
