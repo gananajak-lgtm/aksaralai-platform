@@ -299,6 +299,57 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   return reply({ok:true});
  }
 
+ // Character profiles belong to a novel, not to individual chapters.
+ if(m==='GET'&&(x=p.match(/^\\/api\\/novels\\/(\\d+)\\/characters$/))){
+  const user=await identity(db,req),nid=integer(x[1]);await novel(db,nid,user);
+  return reply({characters:await rows(db,'SELECT id,name,role,biography,position FROM novel_characters WHERE novel_id=? ORDER BY position,id',nid)});
+ }
+ if(m==='POST'&&(x=p.match(/^\\/api\\/writer\\/novels\\/(\\d+)\\/characters$/))){
+  const user=await author(db,req),nid=integer(x[1]);await own(db,nid,user);
+  const d=await payload(req),name=str(d,'name',1,100),role=str(d,'role',0,120),biography=str(d,'biography',0,4000);
+  const position=(await query(db,'SELECT COALESCE(MAX(position),0)+1 AS next FROM novel_characters WHERE novel_id=?',nid)).next;
+  const r=await run(db,'INSERT INTO novel_characters(novel_id,name,role,biography,position,created_at) VALUES(?,?,?,?,?,?)',nid,name,role,biography,position,clock());
+  return reply({id:r.meta.last_row_id},201);
+ }
+ if(m==='PUT'&&(x=p.match(/^\\/api\\/writer\\/characters\\/(\\d+)$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT novel_id FROM novel_characters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตัวละคร');await own(db,c.novel_id,user);
+  const d=await payload(req);
+  await run(db,'UPDATE novel_characters SET name=?,role=?,biography=? WHERE id=?',str(d,'name',1,100),str(d,'role',0,120),str(d,'biography',0,4000),cid);
+  return reply({ok:true});
+ }
+ if(m==='DELETE'&&(x=p.match(/^\\/api\\/writer\\/characters\\/(\\d+)$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT novel_id FROM novel_characters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตัวละคร');await own(db,c.novel_id,user);
+  await run(db,'DELETE FROM novel_characters WHERE id=?',cid);
+  if(env.AUDIO)await env.AUDIO.delete('characters/'+cid);
+  return reply({ok:true});
+ }
+ if(m==='GET'&&(x=p.match(/^\\/api\\/novels\\/(\\d+)\\/characters\\/(\\d+)\\/image$/))){
+  const user=await identity(db,req),nid=integer(x[1]),cid=integer(x[2]);await novel(db,nid,user);
+  const c=await query(db,'SELECT id FROM novel_characters WHERE id=? AND novel_id=?',cid,nid);
+  if(!c||!env.AUDIO)return new Response(null,{status:404});
+  const file=await env.AUDIO.get('characters/'+cid);
+  if(!file)return new Response(null,{status:404});
+  return new Response(file.body,{headers:{'content-type':file.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=60, must-revalidate','x-content-type-options':'nosniff'}});
+ }
+ if(m==='PUT'&&(x=p.match(/^\\/api\\/writer\\/characters\\/(\\d+)\\/image$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT novel_id FROM novel_characters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตัวละคร');await own(db,c.novel_id,user);
+  if(!env.AUDIO)failure(503,'ยังไม่เปิดใช้งานพื้นที่เก็บไฟล์');
+  if(Number(req.headers.get('content-length')||0)>5*1024*1024)failure(413,'ภาพต้องไม่เกิน 5 MB');
+  const buffer=await req.arrayBuffer();
+  if(buffer.byteLength<32||buffer.byteLength>5*1024*1024)failure(400,'ภาพต้องมีขนาดระหว่าง 32 ไบต์ถึง 5 MB');
+  const type=coverImageType(new Uint8Array(buffer),req.headers.get('content-type')||'');
+  await env.AUDIO.put('characters/'+cid,buffer,{httpMetadata:{contentType:type}});
+  return reply({ok:true});
+ }
+ if(m==='DELETE'&&(x=p.match(/^\\/api\\/writer\\/characters\\/(\\d+)\\/image$/))){
+  const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT novel_id FROM novel_characters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตัวละคร');await own(db,c.novel_id,user);
+  if(env.AUDIO)await env.AUDIO.delete('characters/'+cid);
+  return reply({ok:true});
+ }
  if(p==='/api/novels'&&m==='GET'){
   const term=(u.searchParams.get('q')||'').trim().slice(0,120),genre=(u.searchParams.get('genre')||'').trim().slice(0,40);
   let sql='SELECT n.id,n.title,n.summary,n.genre,n.cover_color,n.updated_at,u.display_name AS author,(SELECT COUNT(*) FROM chapters c WHERE c.novel_id=n.id AND c.published=1) chapter_count FROM novels n JOIN users u ON u.id=n.author_id WHERE n.published=1',bind=[];
