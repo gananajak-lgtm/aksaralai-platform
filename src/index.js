@@ -149,6 +149,14 @@ async function api(req,env){
  // Admin AI Assistant, level 2: read-only analysis and typed action proposals.
  // Even confirmed proposals only navigate to existing authenticated screens.
  // NO model-generated arbitrary URLs, SQL, code execution, data mutations or publication.
+ // Admin-only manuscript access: one complete chapter per request, never another writer's work.
+ if(m==='GET'&&(x=p.match(/^\/api\/admin\/chapters\/(\d+)\/manuscript$/))){
+  const actor=await author(db,req);
+  if(!env.OPENAI_TTS_ADMIN_USERNAME||actor.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'เฉพาะบัญชี AI แอดมิน');
+  const cid=integer(x[1]),c=await query(db,'SELECT id,novel_id,title,body FROM chapters WHERE id=?',cid);
+  if(!c)failure(404,'ไม่พบตอน');await own(db,c.novel_id,actor);
+  return reply({chapter:c},{'cache-control':'no-store'});
+ }
  if(p==='/api/admin/assistant'&&m==='POST'){
   const actor=await author(db,req);
   if(!env.OPENAI_API_KEY||!env.OPENAI_TTS_ADMIN_USERNAME||actor.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'ผู้ช่วย AI ใช้งานได้เฉพาะบัญชีผู้ดูแล');
