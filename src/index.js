@@ -165,8 +165,8 @@ async function api(req,env){
   const chapters=await rows(db,'SELECT c.id,c.novel_id,c.title,c.position,c.published FROM chapters c JOIN novels n ON n.id=c.novel_id WHERE n.author_id=? ORDER BY n.updated_at DESC,c.position ASC LIMIT 200',actor.id);
   const activeChapter=Number.isSafeInteger(d.chapter_id)&&d.chapter_id>0?chapters.find(c=>c.id===d.chapter_id):null;
   const selectedManuscript=activeChapter?await query(db,'SELECT body FROM chapters WHERE id=?',activeChapter.id):null;
-  const excerpt=selectedManuscript?.body?.slice(0,12000)||null;
-  const catalog=JSON.stringify({novels:books,chapters:chapters,active_chapter:activeChapter||null,active_chapter_excerpt:excerpt,excerpt_truncated:Boolean(selectedManuscript?.body?.length>12000),limitations:'รายการแสดงได้สูงสุด 40 เรื่องและ 200 ตอน; เนื้อหาที่แนบคือเฉพาะตอนที่กำลังเปิดและสูงสุด 12,000 ตัวอักษร ห้ามอ้างว่าอ่านทั้งเรื่องหรือทั้งตอนหากถูกตัด; การแก้ไขต้องเปิดหน้าแก้ไขและให้ผู้ใช้ยืนยันก่อนบันทึก'});
+  const excerpt=selectedManuscript?.body?.slice(0,40000)||null;
+  const catalog=JSON.stringify({novels:books,chapters:chapters,active_chapter:activeChapter||null,active_chapter_excerpt:excerpt,excerpt_truncated:Boolean(selectedManuscript?.body?.length>40000),limitations:'รายการแสดงได้สูงสุด 40 เรื่องและ 200 ตอน; เนื้อหาที่แนบคือเฉพาะตอนที่กำลังเปิดและสูงสุด 40,000 ตัวอักษร ห้ามอ้างว่าอ่านทั้งเรื่องหรือทั้งตอนหากถูกตัด; การแก้ไขต้องเปิดหน้าแก้ไขและให้ผู้ใช้ยืนยันก่อนบันทึก'});
   let provider;
   try{
    provider=await fetch('https://api.openai.com/v1/chat/completions',{
