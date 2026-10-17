@@ -101,12 +101,12 @@
 <dialog class="ai-admin-dialog" id="ai-admin-dialog" aria-labelledby="ai-admin-title">
   <div class="ai-admin-inner">
    <div class="row between"><h2 id="ai-admin-title">🤖 ผู้ช่วยแอดมินอักษราลัย</h2><button class="btn ghost" type="button" id="ai-admin-close">✕ ปิด</button></div>
-   <p class="small">ระดับ 2 · ให้ AI ตรวจรายการนิยายและเสนอขั้นตอน จากนั้นคุณต้องกดยืนยันก่อนเปิดหน้าดำเนินการ · ไม่มีสิทธิ์ลบ แก้ไข หรือเผยแพร่เอง</p>
+   <p class="small">AI อ่านและวิเคราะห์เนื้อหาของตอนที่กำลังเปิดได้ · การแก้ไขหรือบันทึกต้นฉบับต้องได้รับการยืนยันจากคุณก่อนเสมอ</p>
    <form id="ai-admin-form">
     <label for="ai-admin-prompt">สั่งงานเป็นภาษาไทย</label>
     <textarea id="ai-admin-prompt" maxlength="1000" required placeholder="เช่น ช่วยหาเงาซ่อนพยัคฆ์ตอนที่ 8 แล้วพาฉันไปหน้าแก้ไข / เปิดหน้าส่งออก PDF เรื่องนี้"></textarea>
-    <p class="small">AI จะเห็นเฉพาะรายชื่อเรื่องและข้อมูลตอนของบัญชีแอดมิน ไม่ได้อ่านเนื้อหาทั้งตอนหรือสถานะเสียงจริง · มีค่าเครดิต OpenAI API ตามการใช้งาน</p>
-    <button class="btn" id="ai-admin-ask" type="submit">ถาม AI</button>
+    <p class="small">เมื่อเปิดหน้าแก้ไขตอน AI จะอ่านเนื้อหาตอนนั้นได้สูงสุด 40,000 ตัวอักษร · ไม่มีการบันทึกหรือแก้ไขโดยอัตโนมัติ</p>
+    <button class="btn" id="ai-admin-ask" type="submit">ถาม AI</button><button class="btn ghost" id="ai-admin-analyze" type="button">📖 วิเคราะห์ตอนที่กำลังเปิด</button>
    </form>
    <p class="small" role="status" id="ai-admin-status"></p>
    <section class="panel" id="ai-admin-response" hidden><h3>คำตอบจาก AI</h3><p id="ai-admin-reply" style="white-space:pre-wrap"></p><div id="ai-admin-proposal" hidden><p class="small">AI เสนอการดำเนินการนี้ แต่ยังไม่ได้ทำอะไร</p><div class="controls"><button type="button" class="btn" id="ai-admin-confirm">ยืนยันและเปิดหน้าดำเนินการ</button><button type="button" class="btn ghost" id="ai-admin-reject">ไม่ดำเนินการ</button></div></div></section>
@@ -264,6 +264,11 @@ async function chapterMp3(chapterId,title,novelTitle){
    }else status.textContent='AI ตอบคำถามแล้ว ไม่มีการดำเนินการเพิ่มเติม';
   }catch(err){status.textContent=err.message||'เชื่อมต่อ AI ไม่สำเร็จ';}
   finally{loading=false;document.getElementById('ai-admin-ask').disabled=false;}
+ };
+ document.getElementById('ai-admin-analyze').onclick=function(){
+  if(current.route!=='edit-chapter'||!Number.isSafeInteger(Number(current.id))){status.textContent='กรุณาเปิดหน้าแก้ไขตอนนิยายที่ต้องการวิเคราะห์ก่อน';return;}
+  document.getElementById('ai-admin-prompt').value='อ่านต้นฉบับของตอนที่กำลังเปิดและตรวจความต่อเนื่อง เหตุการณ์ ตัวละคร ความสมเหตุสมผล คำผิด และสำนวนอย่างละเอียด พร้อมระบุจุดที่ควรปรับปรุง ห้ามแก้ไขต้นฉบับโดยอัตโนมัติ';
+  if(!loading)form.requestSubmit();
  };
  confirm.onclick=function(){
   if(!pending)return;
