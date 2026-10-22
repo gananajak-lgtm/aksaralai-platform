@@ -752,7 +752,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
  var panel=document.getElementById('novel-replace-panel');
  if(panel){panel.remove();return;}
  panel=document.createElement('section');panel.id='novel-replace-panel';panel.className='panel';
- panel.innerHTML='<h2>🔎 ค้นหาและแทนที่ทุกตอนในเรื่องนี้</h2><p class="small">ค้นหาตรงตามตัวอักษร รวมถึงตัวพิมพ์และช่องว่าง · ตรวจจำนวนที่พบก่อนยืนยัน · เปลี่ยนเฉพาะเนื้อหาตอน ไม่เปลี่ยนชื่อตอนหรือข้อมูลตัวละคร</p><label>คำเดิม</label><input id="novel-find" maxlength="120" placeholder="เช่น เฮยจ้าว"><label>คำใหม่</label><input id="novel-replacement" maxlength="120" placeholder="เช่น เฮยจ่าว"><p><button type="button" class="btn" id="novel-replace-preview">ตรวจสอบก่อนเปลี่ยน</button></p><div id="novel-replace-result" role="status" style="white-space:pre-wrap"></div><button type="button" class="btn danger" id="novel-replace-apply" hidden>ยืนยันเปลี่ยนทั้งเรื่อง</button><hr><h3>ประวัติการแทนที่คำ</h3><button type="button" class="btn ghost" id="novel-replace-refresh">🔄 โหลดประวัติ</button><div id="novel-replace-history" role="status"></div>';
+ panel.innerHTML='<h2>🔎 ค้นหาและแทนที่ทุกตอนในเรื่องนี้</h2><p class="small">ค้นหาตรงตามตัวอักษร รวมถึงตัวพิมพ์และช่องว่าง · ตรวจจำนวนที่พบก่อนยืนยัน · เปลี่ยนเฉพาะเนื้อหาตอน ไม่เปลี่ยนชื่อตอนหรือข้อมูลตัวละคร</p><label>คำเดิม</label><input id="novel-find" maxlength="120" placeholder="เช่น เฮยจ้าว"><label>คำใหม่</label><input id="novel-replacement" maxlength="120" placeholder="เช่น เฮยจ่าว"><p><button type="button" class="btn" id="novel-replace-preview">ตรวจสอบก่อนเปลี่ยน</button></p><div id="novel-replace-result" role="status" style="white-space:pre-wrap"></div><button type="button" class="btn danger" id="novel-replace-apply" hidden>ยืนยันเปลี่ยนทั้งเรื่อง</button><hr><button type="button" class="btn ghost" id="novel-replace-toggle" aria-expanded="false" aria-controls="novel-replace-history-wrap">📜 แสดงประวัติการแทนที่</button><div id="novel-replace-history-wrap" hidden><button type="button" class="btn ghost" id="novel-replace-refresh">🔄 โหลดประวัติ</button><div id="novel-replace-history" role="status"></div></div>';
  document.getElementById('novelform').after(panel);
  var find=panel.querySelector('#novel-find'),replacement=panel.querySelector('#novel-replacement'),output=panel.querySelector('#novel-replace-result'),apply=panel.querySelector('#novel-replace-apply'),preview=null;
  function reset(){preview=null;apply.hidden=true;output.textContent='กรุณาตรวจสอบอีกครั้งหลังเปลี่ยนคำ';}
@@ -791,8 +791,16 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
    });
   }catch(e){historyBox.textContent=await replacementErrorMessage(e);}
  }
+ var historyWrap=panel.querySelector('#novel-replace-history-wrap'),historyToggle=panel.querySelector('#novel-replace-toggle');
+ historyWrap.style.display='none';
+ historyToggle.onclick=async function(){
+  var opening=historyWrap.hidden||historyWrap.style.display==='none';
+  historyWrap.hidden=!opening;historyWrap.style.display=opening?'':'none';
+  historyToggle.setAttribute('aria-expanded',String(opening));
+  historyToggle.textContent=opening?'📜 ซ่อนประวัติการแทนที่':'📜 แสดงประวัติการแทนที่';
+  if(opening)await loadReplaceHistory();
+ };
  panel.querySelector('#novel-replace-refresh').onclick=loadReplaceHistory;
- loadReplaceHistory();
  panel.querySelector('#novel-replace-preview').onclick=async function(){
   preview=null;apply.hidden=true;output.textContent='กำลังตรวจทุกตอน...';
   try{
@@ -808,7 +816,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
   try{
    var result=await api('/writer/novels/'+id+'/replace-apply','POST',{...preview,confirm:true});
    output.textContent='เปลี่ยนเรียบร้อย '+result.total+' จุด ใน '+result.chapter_count+' ตอน';
-   preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');await loadReplaceHistory();
+   preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');if(!historyWrap.hidden)await loadReplaceHistory();
   }catch(e){output.textContent='❌ ยังไม่ได้เปลี่ยนเนื้อหา: '+await replacementErrorMessage(e);toast(output.textContent);preview=null;apply.hidden=true;}
   finally{apply.disabled=false;}
  };
