@@ -653,19 +653,22 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   try{await ensureReplaceHistory();}
   catch(e){console.error('NOVEL_REPLACE_SCHEMA',String(e));failure(503,'เตรียมประวัติการแทนที่ไม่สำเร็จ (HISTORY_SCHEMA)');}
   const historyId=crypto.randomUUID(),now=clock();
-  const statements=[db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now)];
+  // D1 limits the number of statements in a batch. Use set-based SQL instead of
+  // two statements per chapter, keeping snapshots and edits in one transaction.
   for(const c of changed){
-   const next=c.body.split(find).join(replacement);
-   if(next.length>300000)failure(400,'ผลแทนที่ทำให้ตอนยาวเกิน 300,000 ตัวอักษร');
-   statements.push(db.prepare('INSERT INTO novel_replace_history_chapters(history_id,chapter_id,before_body,after_body,occurrences) VALUES(?,?,?,?,?)').bind(historyId,c.id,c.body,next,c.count));
-   statements.push(db.prepare('UPDATE chapters SET body=? WHERE id=? AND body=?').bind(next,c.id,c.body));
+   if(c.body.split(find).join(replacement).length>300000)failure(400,'ผลแทนที่ทำให้ตอนยาวเกิน 300,000 ตัวอักษร');
   }
-  statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
+  const statements=[
+   db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now),
+   db.prepare('INSERT INTO novel_replace_history_chapters(history_id,chapter_id,before_body,after_body,occurrences) SELECT ?,id,body,replace(body,?,?), (length(body)-length(replace(body,?,\'\')))/length(?) FROM chapters WHERE novel_id=? AND instr(body,?)>0').bind(historyId,find,replacement,find,find,nid,find),
+   db.prepare('UPDATE chapters SET body=replace(body,?,?) WHERE novel_id=? AND instr(body,?)>0 AND EXISTS (SELECT 1 FROM novel_replace_history_chapters h WHERE h.history_id=? AND h.chapter_id=chapters.id AND h.before_body=chapters.body)').bind(find,replacement,nid,find,historyId),
+   db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid)
+  ];
   if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการแก้ไขแบบอะตอมมิก');
   let results;
   try{results=await db.batch(statements);}
   catch(e){console.error('NOVEL_REPLACE_BATCH',String(e));failure(503,'บันทึกการแทนที่ไม่สำเร็จ (BATCH_WRITE) กรุณาตรวจบันทึก Worker');}
-  if(results.slice(1,-1).filter((_,i)=>i%2===1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
+  if(results[1]?.meta?.changes!==changed.length||results[2]?.meta?.changes!==changed.length)failure(409,'จำนวนตอนที่แก้ไขไม่ตรงกับผลตรวจสอบ กรุณาตรวจสอบต้นฉบับก่อนดำเนินการต่อ');
   return reply({ok:true,total,chapter_count:changed.length,history_id:historyId});
  }
  if(m==='PUT'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)$/))){
