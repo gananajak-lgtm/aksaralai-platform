@@ -658,7 +658,11 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   // A missing migration must never look like a successful replacement.
   try{await ensureReplaceHistory();}
   catch(e){console.error('NOVEL_REPLACE_SCHEMA',String(e));failure(503,'เตรียมประวัติการแทนที่ไม่สำเร็จ (HISTORY_SCHEMA)');}
-  const historyId=crypto.randomUUID(),now=clock();
+  const historyColumns=await rows(db,"PRAGMA table_info('novel_replace_history')");
+  const legacyHistory=historyColumns.some(c=>c.name==='id'&&String(c.type).toUpperCase()==='INTEGER');
+  // Reserve the next numeric ID within the same atomic batch for legacy D1 tables.
+  // New installations continue using UUIDs.
+  const historyId=legacyHistory?(await query(db,'SELECT COALESCE(MAX(id),0)+1 AS next_id FROM novel_replace_history')).next_id:crypto.randomUUID(),now=clock();
   // D1 limits the number of statements in a batch. Use set-based SQL instead of
   // two statements per chapter, keeping snapshots and edits in one transaction.
   for(const c of changed){
