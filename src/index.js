@@ -617,6 +617,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(d.confirm!==true||typeof d.fingerprint!=='string'||d.fingerprint!==fingerprint)failure(409,'ต้นฉบับเปลี่ยนไปแล้ว กรุณาตรวจตัวอย่างและยืนยันใหม่');
   if(!total)failure(400,'ไม่พบคำที่ต้องการเปลี่ยน');
   // D1 batch executes the updates atomically; no partial multi-chapter replacement.
+  // A missing migration must never look like a successful replacement.
+  try{await query(db,'SELECT id FROM novel_replace_history LIMIT 1');}
+  catch(e){failure(503,'ฐานข้อมูลยังไม่ได้ติดตั้งประวัติการแทนที่คำ (migration 0009) กรุณาตรวจ GitHub Actions ขั้นตอน Apply D1 migrations');}
   const historyId=crypto.randomUUID(),now=clock();
   const statements=[db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now)];
   for(const c of changed){
