@@ -584,6 +584,14 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
    try{const row=await query(db,sql,nid);checks[name]={ok:true,count:row?.count??0};}
    catch(e){checks[name]={ok:false};}
   }
+  try{
+   const items=await rows(db,'SELECT id,title,body FROM chapters WHERE novel_id=? ORDER BY position',nid);
+   checks.chapter_read={ok:true,count:items.length};
+   try{await sha(JSON.stringify({nid,chapters:items.map(c=>[c.id,c.body])}));checks.fingerprint={ok:true};}
+   catch(e){checks.fingerprint={ok:false};}
+  }catch(e){checks.chapter_read={ok:false};}
+  try{await rows(db,'SELECT id,find_text,replacement_text,affected_count,chapter_count,created_at,undone_at FROM novel_replace_history WHERE novel_id=? ORDER BY created_at DESC,id DESC LIMIT 50',nid);checks.history_read={ok:true};}
+  catch(e){checks.history_read={ok:false};}
   return reply({checks});
  }
  // Repair older deployments where the history migration has not yet been applied.
