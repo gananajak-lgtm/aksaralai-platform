@@ -752,11 +752,39 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
  var panel=document.getElementById('novel-replace-panel');
  if(panel){panel.remove();return;}
  panel=document.createElement('section');panel.id='novel-replace-panel';panel.className='panel';
- panel.innerHTML='<h2>🔎 ค้นหาและแทนที่ทุกตอนในเรื่องนี้</h2><p class="small">ค้นหาตรงตามตัวอักษร รวมถึงตัวพิมพ์และช่องว่าง · ตรวจจำนวนที่พบก่อนยืนยัน · เปลี่ยนเฉพาะเนื้อหาตอน ไม่เปลี่ยนชื่อตอนหรือข้อมูลตัวละคร</p><label>คำเดิม</label><input id="novel-find" maxlength="120" placeholder="เช่น เฮยจ้าว"><label>คำใหม่</label><input id="novel-replacement" maxlength="120" placeholder="เช่น เฮยจ่าว"><p><button type="button" class="btn" id="novel-replace-preview">ตรวจสอบก่อนเปลี่ยน</button></p><div id="novel-replace-result" role="status" style="white-space:pre-wrap"></div><button type="button" class="btn danger" id="novel-replace-apply" hidden>ยืนยันเปลี่ยนทั้งเรื่อง</button>';
+ panel.innerHTML='<h2>🔎 ค้นหาและแทนที่ทุกตอนในเรื่องนี้</h2><p class="small">ค้นหาตรงตามตัวอักษร รวมถึงตัวพิมพ์และช่องว่าง · ตรวจจำนวนที่พบก่อนยืนยัน · เปลี่ยนเฉพาะเนื้อหาตอน ไม่เปลี่ยนชื่อตอนหรือข้อมูลตัวละคร</p><label>คำเดิม</label><input id="novel-find" maxlength="120" placeholder="เช่น เฮยจ้าว"><label>คำใหม่</label><input id="novel-replacement" maxlength="120" placeholder="เช่น เฮยจ่าว"><p><button type="button" class="btn" id="novel-replace-preview">ตรวจสอบก่อนเปลี่ยน</button></p><div id="novel-replace-result" role="status" style="white-space:pre-wrap"></div><button type="button" class="btn danger" id="novel-replace-apply" hidden>ยืนยันเปลี่ยนทั้งเรื่อง</button><hr><h3>ประวัติการแทนที่คำ</h3><button type="button" class="btn ghost" id="novel-replace-refresh">🔄 โหลดประวัติ</button><div id="novel-replace-history" role="status"></div>';
  document.getElementById('novelform').after(panel);
  var find=panel.querySelector('#novel-find'),replacement=panel.querySelector('#novel-replacement'),output=panel.querySelector('#novel-replace-result'),apply=panel.querySelector('#novel-replace-apply'),preview=null;
  function reset(){preview=null;apply.hidden=true;output.textContent='กรุณาตรวจสอบอีกครั้งหลังเปลี่ยนคำ';}
  find.oninput=reset;replacement.oninput=reset;
+ var historyBox=panel.querySelector('#novel-replace-history');
+ async function loadReplaceHistory(){
+  historyBox.textContent='กำลังโหลดประวัติ...';
+  try{
+   var result=await api('/writer/novels/'+id+'/replace-history');
+   historyBox.replaceChildren();
+   if(!result.history.length){historyBox.textContent='ยังไม่มีประวัติการแทนที่คำ';return;}
+   result.history.forEach(function(item){
+    var row=document.createElement('div');row.className='chapter-item';
+    var label=document.createElement('span');
+    label.textContent='“'+item.find_text+'” → “'+item.replacement_text+'” · '+item.affected_count+' จุด / '+item.chapter_count+' ตอน · '+new Date(item.created_at*1000).toLocaleString('th-TH')+(item.undone_at?' · ย้อนคืนแล้ว':'');
+    row.appendChild(label);
+    if(!item.undone_at){
+     var undo=document.createElement('button');undo.type='button';undo.className='btn ghost';undo.textContent='↩ ย้อนคืน';
+     undo.onclick=async function(){
+      if(!confirm('ยืนยันย้อนคืนการแทนที่ “'+item.find_text+'” → “'+item.replacement_text+'” หรือไม่? ระบบจะไม่ย้อนคืนถ้ามีการแก้ไขตอนเหล่านั้นเพิ่มเติม'))return;
+      undo.disabled=true;
+      try{await api('/writer/novels/'+id+'/replace-undo','POST',{history_id:item.id,confirm:true});toast('ย้อนคืนสำเร็จ');await loadReplaceHistory();}
+      catch(e){toast(e.message||'ย้อนคืนไม่สำเร็จ');undo.disabled=false;}
+     };
+     row.appendChild(undo);
+    }
+    historyBox.appendChild(row);
+   });
+  }catch(e){historyBox.textContent=e.message||'โหลดประวัติไม่สำเร็จ';}
+ }
+ panel.querySelector('#novel-replace-refresh').onclick=loadReplaceHistory;
+ loadReplaceHistory();
  panel.querySelector('#novel-replace-preview').onclick=async function(){
   preview=null;apply.hidden=true;output.textContent='กำลังตรวจทุกตอน...';
   try{
@@ -772,7 +800,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
   try{
    var result=await api('/writer/novels/'+id+'/replace-apply','POST',{...preview,confirm:true});
    output.textContent='เปลี่ยนเรียบร้อย '+result.total+' จุด ใน '+result.chapter_count+' ตอน';
-   preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');
+   preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');await loadReplaceHistory();
   }catch(e){output.textContent=e.message||'บันทึกไม่สำเร็จ';preview=null;apply.hidden=true;}
   finally{apply.disabled=false;}
  };
