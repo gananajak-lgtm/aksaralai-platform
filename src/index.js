@@ -660,9 +660,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   catch(e){console.error('NOVEL_REPLACE_SCHEMA',String(e));failure(503,'เตรียมประวัติการแทนที่ไม่สำเร็จ (HISTORY_SCHEMA)');}
   const historyColumns=await rows(db,"PRAGMA table_info('novel_replace_history')");
   const legacyHistory=historyColumns.some(c=>c.name==='id'&&String(c.type).toUpperCase()==='INTEGER');
-  // Reserve the next numeric ID within the same atomic batch for legacy D1 tables.
+  // Use a random safe integer for legacy D1 history IDs to avoid MAX(id)+1 races.
   // New installations continue using UUIDs.
-  const historyId=legacyHistory?(await query(db,'SELECT COALESCE(MAX(id),0)+1 AS next_id FROM novel_replace_history')).next_id:crypto.randomUUID(),now=clock();
+  const historyId=legacyHistory?Math.floor(Math.random()*Number.MAX_SAFE_INTEGER)+1:crypto.randomUUID(),now=clock();
   // D1 limits the number of statements in a batch. Use set-based SQL instead of
   // two statements per chapter, keeping snapshots and edits in one transaction.
   for(const c of changed){
