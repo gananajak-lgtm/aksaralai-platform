@@ -576,6 +576,29 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // Literal whole-novel find/replace. Preview is read-only; apply requires explicit confirmation.
+ if(m==='POST'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-(preview|apply)$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const d=await payload(req),find=str(d,'find',1,120),replacement=str(d,'replacement',0,120);
+  if(find===replacement)failure(400,'คำเดิมและคำใหม่ต้องต่างกัน');
+  const chapters=await rows(db,'SELECT id,title,body FROM chapters WHERE novel_id=? ORDER BY position',nid);
+  const changed=chapters.map(c=>{
+   const count=c.body.split(find).length-1;
+   return {id:c.id,title:c.title,count,body:c.body};
+  }).filter(c=>c.count>0);
+  const total=changed.reduce((n,c)=>n+c.count,0);
+  const fingerprint=await sha(JSON.stringify({nid,find,replacement,chapters:chapters.map(c=>[c.id,c.body])}));
+  if(x[2]==='preview')return reply({chapters:changed.map(c=>({id:c.id,title:c.title,count:c.count})),total,chapter_count:changed.length,fingerprint});
+  if(d.confirm!==true||typeof d.fingerprint!=='string'||d.fingerprint!==fingerprint)failure(409,'ต้นฉบับเปลี่ยนไปแล้ว กรุณาตรวจตัวอย่างและยืนยันใหม่');
+  if(!total)failure(400,'ไม่พบคำที่ต้องการเปลี่ยน');
+  // D1 batch executes the updates atomically; no partial multi-chapter replacement.
+  const statements=changed.map(c=>db.prepare('UPDATE chapters SET body=? WHERE id=? AND body=?').bind(c.body.split(find).join(replacement),c.id,c.body));
+  statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
+  if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการแก้ไขแบบอะตอมมิก');
+  const results=await db.batch(statements);
+  if(results.slice(0,-1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
+  return reply({ok:true,total,chapter_count:changed.length});
+ }
  if(m==='PUT'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)$/))){
   const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT * FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');
   await own(db,c.novel_id,user);const d=chapterData(await payload(req));
