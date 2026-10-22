@@ -801,7 +801,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
    var result=await api('/writer/novels/'+id+'/replace-apply','POST',{...preview,confirm:true});
    output.textContent='เปลี่ยนเรียบร้อย '+result.total+' จุด ใน '+result.chapter_count+' ตอน';
    preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');await loadReplaceHistory();
-  }catch(e){output.textContent=e.message||'บันทึกไม่สำเร็จ';preview=null;apply.hidden=true;}
+  }catch(e){output.textContent='❌ ยังไม่ได้เปลี่ยนเนื้อหา: '+(e.message||'บันทึกไม่สำเร็จ');toast(output.textContent);preview=null;apply.hidden=true;}
   finally{apply.disabled=false;}
  };
 };var removeCover=document.getElementById('remove-cover');if(removeCover)removeCover.onclick=async function(){if(!confirm('ต้องการลบภาพหน้าปกของนิยายเรื่องนี้หรือไม่?'))return;var res=await fetch('/api/writer/novels/'+id+'/cover',{method:'DELETE',credentials:'same-origin'});if(!res.ok){var info={};try{info=await res.json();}catch(e){}toast(info.detail||'ลบภาพหน้าปกไม่สำเร็จ');return;}toast('ลบภาพหน้าปกแล้ว');go('edit',id);};document.getElementById('newchapter').onclick=function(){chapterForm(id);};revealAdminPdfExport(id,null);document.getElementById('publish').onclick=async function(){var r=await call(function(){return api('/writer/novels/'+id+'/publish','POST',{published:!n.published});});if(r)go('edit',id);};document.getElementById('delete-novel').onclick=async function(){if(!confirm('ลบนิยาย “'+n.title+'” ทั้งเรื่องหรือไม่?\n\nทุกตอน ความคิดเห็น ความคืบหน้า และไฟล์เสียงของเรื่องนี้จะถูกลบ และไม่สามารถกู้คืนได้'))return;var r=await call(function(){return api('/writer/novels/'+id,'DELETE');});if(r){toast('ลบนิยายแล้ว');go('studio');}};}}
