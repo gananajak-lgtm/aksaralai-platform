@@ -650,7 +650,8 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!total)failure(400,'ไม่พบคำที่ต้องการเปลี่ยน');
   // D1 batch executes the updates atomically; no partial multi-chapter replacement.
   // A missing migration must never look like a successful replacement.
-  await ensureReplaceHistory();
+  try{await ensureReplaceHistory();}
+  catch(e){console.error('NOVEL_REPLACE_SCHEMA',String(e));failure(503,'เตรียมประวัติการแทนที่ไม่สำเร็จ (HISTORY_SCHEMA)');}
   const historyId=crypto.randomUUID(),now=clock();
   const statements=[db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now)];
   for(const c of changed){
@@ -661,7 +662,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   }
   statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
   if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการแก้ไขแบบอะตอมมิก');
-  const results=await db.batch(statements);
+  let results;
+  try{results=await db.batch(statements);}
+  catch(e){console.error('NOVEL_REPLACE_BATCH',String(e));failure(503,'บันทึกการแทนที่ไม่สำเร็จ (BATCH_WRITE) กรุณาตรวจบันทึก Worker');}
   if(results.slice(1,-1).filter((_,i)=>i%2===1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
   return reply({ok:true,total,chapter_count:changed.length,history_id:historyId});
  }
