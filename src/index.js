@@ -576,13 +576,20 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // Repair older deployments where the history migration has not yet been applied.
+ async function ensureReplaceHistory(){
+  await run(db,'CREATE TABLE IF NOT EXISTS novel_replace_history (id TEXT PRIMARY KEY, novel_id INTEGER NOT NULL REFERENCES novels(id) ON DELETE CASCADE, find_text TEXT NOT NULL, replacement_text TEXT NOT NULL, affected_count INTEGER NOT NULL, chapter_count INTEGER NOT NULL, created_at INTEGER NOT NULL, undone_at INTEGER)');
+  await run(db,'CREATE INDEX IF NOT EXISTS idx_novel_replace_history ON novel_replace_history(novel_id,id DESC)');
+  await run(db,'CREATE TABLE IF NOT EXISTS novel_replace_history_chapters (history_id TEXT NOT NULL REFERENCES novel_replace_history(id) ON DELETE CASCADE, chapter_id INTEGER NOT NULL REFERENCES chapters(id) ON DELETE CASCADE, before_body TEXT NOT NULL, after_body TEXT NOT NULL, occurrences INTEGER NOT NULL, PRIMARY KEY(history_id,chapter_id))');
+ }
  // Replacement history and conflict-safe undo are restricted to the novel owner.
  if(m==='GET'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-history$/))){
-  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);await ensureReplaceHistory();
   return reply({history:await rows(db,'SELECT id,find_text,replacement_text,affected_count,chapter_count,created_at,undone_at FROM novel_replace_history WHERE novel_id=? ORDER BY created_at DESC,id DESC LIMIT 50',nid)});
  }
  if(m==='POST'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-undo$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  await ensureReplaceHistory();
   const d=await payload(req);
   if(d.confirm!==true||typeof d.history_id!=='string')failure(400,'ต้องยืนยันรายการที่จะย้อนคืน');
   const record=await query(db,'SELECT * FROM novel_replace_history WHERE id=? AND novel_id=?',d.history_id,nid);
@@ -618,8 +625,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!total)failure(400,'ไม่พบคำที่ต้องการเปลี่ยน');
   // D1 batch executes the updates atomically; no partial multi-chapter replacement.
   // A missing migration must never look like a successful replacement.
-  try{await query(db,'SELECT id FROM novel_replace_history LIMIT 1');}
-  catch(e){failure(503,'ฐานข้อมูลยังไม่ได้ติดตั้งประวัติการแทนที่คำ (migration 0009) กรุณาตรวจ GitHub Actions ขั้นตอน Apply D1 migrations');}
+  await ensureReplaceHistory();
   const historyId=crypto.randomUUID(),now=clock();
   const statements=[db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now)];
   for(const c of changed){
