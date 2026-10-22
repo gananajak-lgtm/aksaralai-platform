@@ -592,6 +592,12 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   }catch(e){checks.chapter_read={ok:false};}
   try{await rows(db,'SELECT id,find_text,replacement_text,affected_count,chapter_count,created_at,undone_at FROM novel_replace_history WHERE novel_id=? ORDER BY created_at DESC,id DESC LIMIT 50',nid);checks.history_read={ok:true};}
   catch(e){checks.history_read={ok:false};}
+  try{
+   const schema=await rows(db,"PRAGMA table_info('novel_replace_history')");
+   checks.history_id_schema={type:schema.find(c=>c.name==='id')?.type||'missing',primary_key:schema.find(c=>c.name==='id')?.pk||0};
+   const child=await rows(db,"PRAGMA table_info('novel_replace_history_chapters')");
+   checks.snapshot_history_id_schema={type:child.find(c=>c.name==='history_id')?.type||'missing'};
+  }catch(e){checks.history_id_schema={type:'unavailable'};}
   return reply({checks});
  }
  // Repair older deployments where the history migration has not yet been applied.
