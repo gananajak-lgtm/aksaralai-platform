@@ -576,6 +576,16 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // Owner-only readiness checks; no manuscript content or database error details.
+ if(m==='GET'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-diagnostics$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const checks={};
+  for(const [name,sql] of [['chapters','SELECT COUNT(*) AS count FROM chapters WHERE novel_id=?'],['history','SELECT COUNT(*) AS count FROM novel_replace_history WHERE novel_id=?'],['snapshots','SELECT COUNT(*) AS count FROM novel_replace_history_chapters WHERE history_id IN (SELECT id FROM novel_replace_history WHERE novel_id=?)']]){
+   try{const row=await query(db,sql,nid);checks[name]={ok:true,count:row?.count??0};}
+   catch(e){checks[name]={ok:false};}
+  }
+  return reply({checks});
+ }
  // Repair older deployments where the history migration has not yet been applied.
  async function ensureReplaceHistory(){
   await run(db,'CREATE TABLE IF NOT EXISTS novel_replace_history (id TEXT PRIMARY KEY, novel_id INTEGER NOT NULL REFERENCES novels(id) ON DELETE CASCADE, find_text TEXT NOT NULL, replacement_text TEXT NOT NULL, affected_count INTEGER NOT NULL, chapter_count INTEGER NOT NULL, created_at INTEGER NOT NULL, undone_at INTEGER)');
