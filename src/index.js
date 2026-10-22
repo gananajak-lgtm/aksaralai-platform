@@ -628,7 +628,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
   if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการแก้ไขแบบอะตอมมิก');
   const results=await db.batch(statements);
-  if(results.slice(2,-1).filter((_,i)=>i%2===1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
+  if(results.slice(1,-1).filter((_,i)=>i%2===1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
   return reply({ok:true,total,chapter_count:changed.length,history_id:historyId});
  }
  if(m==='PUT'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)$/))){
