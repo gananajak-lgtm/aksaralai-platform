@@ -761,7 +761,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
   try{
    var d=await api('/writer/novels/'+id+'/replace-diagnostics');
    var broken=Object.keys(d.checks).filter(function(k){return !d.checks[k].ok;});
-   if(broken.length)return 'ฐานข้อมูลส่วน '+broken.join(', ')+' ยังไม่พร้อม กรุณาตรวจ Migration 0009 ใน GitHub Actions';
+   if(broken.length)return 'ตรวจพบจุดผิดพลาด: '+broken.join(', ')+' · กรุณาส่งข้อความนี้ให้ผู้พัฒนา';
    return (error.message||'เกิดข้อผิดพลาด')+' (ฐานข้อมูลพร้อม แต่คำขอยังล้มเหลว)';
   }catch(e){return (error.message||'เกิดข้อผิดพลาด')+' (ตรวจสอบสถานะฐานข้อมูลไม่สำเร็จ)';}
  }
