@@ -576,6 +576,31 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // Replacement history and conflict-safe undo are restricted to the novel owner.
+ if(m==='GET'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-history$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  return reply({history:await rows(db,'SELECT id,find_text,replacement_text,affected_count,chapter_count,created_at,undone_at FROM novel_replace_history WHERE novel_id=? ORDER BY created_at DESC,id DESC LIMIT 50',nid)});
+ }
+ if(m==='POST'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-undo$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const d=await payload(req);
+  if(d.confirm!==true||typeof d.history_id!=='string')failure(400,'ต้องยืนยันรายการที่จะย้อนคืน');
+  const record=await query(db,'SELECT * FROM novel_replace_history WHERE id=? AND novel_id=?',d.history_id,nid);
+  if(!record)failure(404,'ไม่พบประวัติ');if(record.undone_at)failure(409,'รายการนี้ถูกย้อนคืนแล้ว');
+  const snapshots=await rows(db,'SELECT chapter_id,before_body,after_body FROM novel_replace_history_chapters WHERE history_id=?',record.id);
+  if(!snapshots.length)failure(409,'ไม่มีข้อมูลสำรอง');
+  for(const snap of snapshots){
+   const current=await query(db,'SELECT body FROM chapters WHERE id=? AND novel_id=?',snap.chapter_id,nid);
+   if(!current||current.body!==snap.after_body)failure(409,'ต้นฉบับมีการแก้ไขเพิ่มเติมแล้ว จึงไม่สามารถย้อนคืนอัตโนมัติได้');
+  }
+  if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการย้อนคืนแบบอะตอมมิก');
+  const statements=snapshots.map(c=>db.prepare('UPDATE chapters SET body=? WHERE id=? AND body=?').bind(c.before_body,c.chapter_id,c.after_body));
+  statements.push(db.prepare('UPDATE novel_replace_history SET undone_at=? WHERE id=? AND undone_at IS NULL').bind(clock(),record.id));
+  statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
+  const results=await db.batch(statements);
+  if(results.slice(0,-2).some(r=>r.meta?.changes!==1)||results[results.length-2]?.meta?.changes!==1)failure(409,'ข้อมูลเปลี่ยนระหว่างย้อนคืน กรุณาตรวจสอบ');
+  return reply({ok:true,chapter_count:snapshots.length});
+ }
  // Literal whole-novel find/replace. Preview is read-only; apply requires explicit confirmation.
  if(m==='POST'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-(preview|apply)$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
@@ -592,12 +617,19 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(d.confirm!==true||typeof d.fingerprint!=='string'||d.fingerprint!==fingerprint)failure(409,'ต้นฉบับเปลี่ยนไปแล้ว กรุณาตรวจตัวอย่างและยืนยันใหม่');
   if(!total)failure(400,'ไม่พบคำที่ต้องการเปลี่ยน');
   // D1 batch executes the updates atomically; no partial multi-chapter replacement.
-  const statements=changed.map(c=>db.prepare('UPDATE chapters SET body=? WHERE id=? AND body=?').bind(c.body.split(find).join(replacement),c.id,c.body));
+  const historyId=crypto.randomUUID(),now=clock();
+  const statements=[db.prepare('INSERT INTO novel_replace_history(id,novel_id,find_text,replacement_text,affected_count,chapter_count,created_at) VALUES(?,?,?,?,?,?,?)').bind(historyId,nid,find,replacement,total,changed.length,now)];
+  for(const c of changed){
+   const next=c.body.split(find).join(replacement);
+   if(next.length>300000)failure(400,'ผลแทนที่ทำให้ตอนยาวเกิน 300,000 ตัวอักษร');
+   statements.push(db.prepare('INSERT INTO novel_replace_history_chapters(history_id,chapter_id,before_body,after_body,occurrences) VALUES(?,?,?,?,?)').bind(historyId,c.id,c.body,next,c.count));
+   statements.push(db.prepare('UPDATE chapters SET body=? WHERE id=? AND body=?').bind(next,c.id,c.body));
+  }
   statements.push(db.prepare('UPDATE novels SET updated_at=? WHERE id=?').bind(clock(),nid));
   if(typeof db.batch!=='function')failure(503,'ฐานข้อมูลไม่รองรับการแก้ไขแบบอะตอมมิก');
   const results=await db.batch(statements);
-  if(results.slice(0,-1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
-  return reply({ok:true,total,chapter_count:changed.length});
+  if(results.slice(2,-1).filter((_,i)=>i%2===1).some(result=>result.meta?.changes!==1))failure(409,'ข้อมูลบางตอนเปลี่ยนระหว่างบันทึก กรุณาตรวจสอบอีกครั้ง');
+  return reply({ok:true,total,chapter_count:changed.length,history_id:historyId});
  }
  if(m==='PUT'&&(x=p.match(/^\/api\/writer\/chapters\/(\d+)$/))){
   const user=await author(db,req),cid=integer(x[1]),c=await query(db,'SELECT * FROM chapters WHERE id=?',cid);if(!c)failure(404,'ไม่พบตอน');
