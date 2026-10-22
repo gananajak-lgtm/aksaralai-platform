@@ -757,6 +757,14 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
  var find=panel.querySelector('#novel-find'),replacement=panel.querySelector('#novel-replacement'),output=panel.querySelector('#novel-replace-result'),apply=panel.querySelector('#novel-replace-apply'),preview=null;
  function reset(){preview=null;apply.hidden=true;output.textContent='กรุณาตรวจสอบอีกครั้งหลังเปลี่ยนคำ';}
  find.oninput=reset;replacement.oninput=reset;
+ async function replacementErrorMessage(error){
+  try{
+   var d=await api('/writer/novels/'+id+'/replace-diagnostics');
+   var broken=Object.keys(d.checks).filter(function(k){return !d.checks[k].ok;});
+   if(broken.length)return 'ฐานข้อมูลส่วน '+broken.join(', ')+' ยังไม่พร้อม กรุณาตรวจ Migration 0009 ใน GitHub Actions';
+   return (error.message||'เกิดข้อผิดพลาด')+' (ฐานข้อมูลพร้อม แต่คำขอยังล้มเหลว)';
+  }catch(e){return (error.message||'เกิดข้อผิดพลาด')+' (ตรวจสอบสถานะฐานข้อมูลไม่สำเร็จ)';}
+ }
  var historyBox=panel.querySelector('#novel-replace-history');
  async function loadReplaceHistory(){
   historyBox.textContent='กำลังโหลดประวัติ...';
@@ -781,7 +789,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
     }
     historyBox.appendChild(row);
    });
-  }catch(e){historyBox.textContent=e.message||'โหลดประวัติไม่สำเร็จ';}
+  }catch(e){historyBox.textContent=await replacementErrorMessage(e);}
  }
  panel.querySelector('#novel-replace-refresh').onclick=loadReplaceHistory;
  loadReplaceHistory();
@@ -791,7 +799,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
    var result=await api('/writer/novels/'+id+'/replace-preview','POST',{find:find.value,replacement:replacement.value});
    output.textContent='พบ '+result.total+' จุด ใน '+result.chapter_count+' ตอน\\n'+result.chapters.map(function(c){return 'ตอน '+c.title+': '+c.count+' จุด';}).join('\\n');
    if(result.total){preview={find:find.value,replacement:replacement.value,fingerprint:result.fingerprint};apply.hidden=false;}
-  }catch(e){output.textContent=e.message||'ตรวจสอบไม่สำเร็จ';}
+  }catch(e){output.textContent='❌ '+await replacementErrorMessage(e);}
  };
  apply.onclick=async function(){
   if(!preview||find.value!==preview.find||replacement.value!==preview.replacement)return;
@@ -801,7 +809,7 @@ document.getElementById('novelform').onsubmit=async function(e){e.preventDefault
    var result=await api('/writer/novels/'+id+'/replace-apply','POST',{...preview,confirm:true});
    output.textContent='เปลี่ยนเรียบร้อย '+result.total+' จุด ใน '+result.chapter_count+' ตอน';
    preview=null;apply.hidden=true;toast('แทนที่คำทั้งเรื่องเรียบร้อย');await loadReplaceHistory();
-  }catch(e){output.textContent='❌ ยังไม่ได้เปลี่ยนเนื้อหา: '+(e.message||'บันทึกไม่สำเร็จ');toast(output.textContent);preview=null;apply.hidden=true;}
+  }catch(e){output.textContent='❌ ยังไม่ได้เปลี่ยนเนื้อหา: '+await replacementErrorMessage(e);toast(output.textContent);preview=null;apply.hidden=true;}
   finally{apply.disabled=false;}
  };
 };var removeCover=document.getElementById('remove-cover');if(removeCover)removeCover.onclick=async function(){if(!confirm('ต้องการลบภาพหน้าปกของนิยายเรื่องนี้หรือไม่?'))return;var res=await fetch('/api/writer/novels/'+id+'/cover',{method:'DELETE',credentials:'same-origin'});if(!res.ok){var info={};try{info=await res.json();}catch(e){}toast(info.detail||'ลบภาพหน้าปกไม่สำเร็จ');return;}toast('ลบภาพหน้าปกแล้ว');go('edit',id);};document.getElementById('newchapter').onclick=function(){chapterForm(id);};revealAdminPdfExport(id,null);document.getElementById('publish').onclick=async function(){var r=await call(function(){return api('/writer/novels/'+id+'/publish','POST',{published:!n.published});});if(r)go('edit',id);};document.getElementById('delete-novel').onclick=async function(){if(!confirm('ลบนิยาย “'+n.title+'” ทั้งเรื่องหรือไม่?\n\nทุกตอน ความคิดเห็น ความคืบหน้า และไฟล์เสียงของเรื่องนี้จะถูกลบ และไม่สามารถกู้คืนได้'))return;var r=await call(function(){return api('/writer/novels/'+id,'DELETE');});if(r){toast('ลบนิยายแล้ว');go('studio');}};}}
