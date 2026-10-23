@@ -42,7 +42,7 @@ export function makeDocx(title,chapters){
   paragraph(title,'Title'),
   ...chapters.flatMap(c=>[
    paragraph(String(c.position)+'. '+c.title,'Heading1'),
-   ...c.body.split(/\r\n|\r|\n/).map(line=>paragraph(line))
+   ...String(c.body??'').split(/\r\n|\r|\n/).map(line=>paragraph(line))
   ])
  ].join('');
  const document='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
