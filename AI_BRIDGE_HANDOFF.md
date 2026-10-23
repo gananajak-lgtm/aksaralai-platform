@@ -31,3 +31,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - This is a JSON-RPC foundation, not a verified interoperable remote MCP implementation. Protocol compliance, streaming transport, OAuth 2.1 and ChatGPT account connection are outstanding.
 - Never paste session cookies into ChatGPT or expose the MCP endpoint anonymously.
 - Run node --check, npm test, and authenticated end-to-end tests before treating this as production-ready.
+
+## 2026-10-23 protocol follow-up
+- Commit 60c4738: require request IDs for JSON-RPC requests except initialized notification; validate initialize protocolVersion; add ping.
+- GitHub connector's commit-workflow-runs query returned no runs for commit 5caa526; this does NOT establish CI success or failure (the query is PR-filtered).
+- Still missing full remote MCP transport compliance, OAuth authorization-code + PKCE, and authenticated integration tests. Keep bridge private and read-only.
