@@ -246,7 +246,9 @@ async function api(req,env){
    const title=selected!==null?book.title+' — '+chapters[0].title:book.title+(u.searchParams.has('start')?' — ตอนที่ '+chapters[0].position+'–'+chapters[chapters.length-1].position:'');
    const safeName=(title.replace(/[\\/\\<>:"|?*\\x00-\\x1f]/g,'_').slice(0,95).trim()||'aksaralai')+'.'+exportFormat;
    const filename='attachment; filename="aksaralai-manuscript.'+exportFormat+'"; filename*=UTF-8\'\''+encodeURIComponent(safeName);
-   const body=exportFormat==='docx'?makeDocx(title,chapters):makePlainText(title,chapters);
+   let body;
+   try{body=exportFormat==='docx'?makeDocx(title,chapters):makePlainText(title,chapters);}
+   catch(e){console.error('MANUSCRIPT_EXPORT_BUILD_FAILED',exportFormat,'chapters',chapters.length,'characters',chapters.reduce((n,c)=>n+(c.body||'').length,0),String(e));failure(500,'MANUSCRIPT_EXPORT_BUILD_FAILED');}
    return new Response(body,{status:200,headers:{
     'content-type':exportFormat==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'text/plain; charset=utf-8',
     'content-disposition':filename,
@@ -808,7 +810,7 @@ export default {async fetch(req,env){
    if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
    if(req.headers.get('sec-fetch-site')==='cross-site')return reply({detail:'Forbidden site'},403);
   }
-  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
+  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:e.message==='MANUSCRIPT_EXPORT_BUILD_FAILED'?'MANUSCRIPT_EXPORT_BUILD_FAILED':['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
  }
  if(!['GET','HEAD'].includes(m))return new Response('Method not allowed',{status:405});
  if(!env.ASSETS)return new Response('Missing static assets binding',{status:503});
