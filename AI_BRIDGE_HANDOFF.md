@@ -79,3 +79,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit c5e7946: redeemAuthorizationCode validates client, redirect URI and PKCE S256 before atomic single-use consumption.
 - Commits 6ac3521 and c75c1e6: mocked D1 unit tests for successful redemption, replay prevention, invalid verifier/client/redirect and token revocation.
 - IMPORTANT: OAuth routes, consent, client registration, token issuance and MCP bearer auth are NOT implemented. CI and D1 migration status are unverified. Keep MCP disabled until full end-to-end authorization tests pass.
+
+## OAuth bearer verification groundwork (2026-10-23)
+- Commit 72a6e1a adds src/oauth-bearer.js: strict Bearer parsing, SHA-256 token hashing, active read-only token lookup without cookie fallback.
+- Commit faa4557 adds test/oauth-bearer.test.js for parsing, hashing, DB lookup, scope rejection.
+- Not wired into /api/mcp yet. OAuth consent, issuance, client registry and full token lifecycle are incomplete. Keep AKSARALAI_MCP_ENABLED unset. CI, migration and deploy not verified.
