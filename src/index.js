@@ -229,14 +229,21 @@ async function api(req,env){
    if(!one)failure(404,'ไม่พบตอนที่ต้องการส่งออก');
    chapters=[one];
   }else{
-   chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC',novelId);
+   const startRaw=u.searchParams.get('start'),countRaw=u.searchParams.get('count');
+   if(startRaw!==null||countRaw!==null){
+    const start=Number(startRaw),count=Number(countRaw);
+    if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>20)failure(400,'ช่วงตอนต้องเริ่มตั้งแต่ 1 และส่งออกได้ไม่เกิน 20 ตอนต่อไฟล์');
+    chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC,id ASC LIMIT ? OFFSET ?',count,start-1);
+   }else{
+    chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC,id ASC',novelId);
+   }
   }
   if(!chapters.length)failure(404,'ยังไม่มีต้นฉบับให้ส่งออก');
   if(chapters.reduce((n,c)=>n+(c.body||'').length,0)>1200000)failure(413,'ต้นฉบับยาวมาก กรุณาส่งออกทีละตอนเพื่อลดการค้างบนมือถือ');
   const exportFormat=u.searchParams.get('format')||'pdf';
   if(!['pdf','docx','txt'].includes(exportFormat))failure(400,'รูปแบบไฟล์ไม่ถูกต้อง');
   if(exportFormat==='docx'||exportFormat==='txt'){
-   const title=selected!==null?book.title+' — '+chapters[0].title:book.title;
+   const title=selected!==null?book.title+' — '+chapters[0].title:book.title+(u.searchParams.has('start')?' — ตอนที่ '+chapters[0].position+'–'+chapters[chapters.length-1].position:'');
    const safeName=(title.replace(/[\\/\\<>:"|?*\\x00-\\x1f]/g,'_').slice(0,95).trim()||'aksaralai')+'.'+exportFormat;
    const filename='attachment; filename="aksaralai-manuscript.'+exportFormat+'"; filename*=UTF-8\'\''+encodeURIComponent(safeName);
    const body=exportFormat==='docx'?makeDocx(title,chapters):makePlainText(title,chapters);
