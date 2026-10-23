@@ -45,3 +45,8 @@ test('unfinished MCP endpoint is disabled by default',()=>{
  assert.match(block,/AKSARALAI_MCP_ENABLED/);
  assert.match(block,/failure\(503,'MCP connector is not enabled'\)/);
 });
+
+test('manuscript export classifies build failures without exposing content',()=>{
+ assert.match(source,/MANUSCRIPT_EXPORT_BUILD_FAILED/);
+ assert.match(source,/catch\(e\)\{console\.error\('MANUSCRIPT_EXPORT_BUILD_FAILED'/);
+});
