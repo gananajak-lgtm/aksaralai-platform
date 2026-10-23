@@ -589,11 +589,11 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const actor=await author(db,req);
   return reply({novels:await rows(db,'SELECT id,title,summary,updated_at FROM novels WHERE author_id=? ORDER BY updated_at DESC LIMIT 100',actor.id)});
  }
- if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/chapters$/))){
+ if(m==='GET'&&(x=p.match(/^\/api\/bridge\/novels\/(\d+)\/chapters$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
   return reply({chapters:await rows(db,'SELECT id,title,position FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT 500',nid)});
  }
- if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/read$/))){
+ if(m==='GET'&&(x=p.match(/^\/api\/bridge\/novels\/(\d+)\/read$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
   const start=Number(u.searchParams.get('start')||1),count=Number(u.searchParams.get('count')||1);
   if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)failure(400,'อ่านได้ครั้งละ 1–5 ตอน และ start ต้องมากกว่า 0');
@@ -602,7 +602,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(chapters.reduce((sum,c)=>sum+(c.body?.length||0),0)>100000)failure(413,'ช่วงตอนยาวเกินไป กรุณาลดจำนวนตอน');
   return reply({novel_id:nid,start,count:chapters.length,chapters});
  }
- if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/search$/))){
+ if(m==='GET'&&(x=p.match(/^\/api\/bridge\/novels\/(\d+)\/search$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
   const term=u.searchParams.get('q')||'';
   if(term.length<2||term.length>100)failure(400,'คำค้นต้องยาว 2–100 ตัวอักษร');
