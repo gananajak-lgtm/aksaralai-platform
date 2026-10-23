@@ -589,12 +589,12 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const actor=await author(db,req),d=await payload(req);
   const id=d.id;
   if(d.method!=='notifications/initialized'&&id===undefined)failure(400,'MCP request id required');
-  if(d.jsonrpc!=='2.0'||typeof d.method!=='string'||(id!==undefined&&typeof id!=='string'&&typeof id!=='number'))failure(400,'คำขอ MCP ไม่ถูกต้อง');
+  if(d.jsonrpc!=='2.0'||typeof d.method!=='string'||(id!==undefined&&(typeof id!=='string'&&(!Number.isSafeInteger(id)))))failure(400,'คำขอ MCP ไม่ถูกต้อง');
   const result=value=>reply({jsonrpc:'2.0',id:id??null,result:value});
   const err=(code,message)=>reply({jsonrpc:'2.0',id:id??null,error:{code,message}});
   if(d.method==='initialize'){
    const requested=d.params?.protocolVersion;
-   if(typeof requested!=='string')return err(-32602,'Missing protocol version');
+   if(requested!=='2025-03-26')return err(-32602,'Unsupported protocol version');
    return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'aksaralai-readonly',version:'0.1.0'}});
   }
   if(d.method==='notifications/initialized')return new Response(null,{status:202});
