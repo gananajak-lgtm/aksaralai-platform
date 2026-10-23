@@ -220,7 +220,10 @@ async function api(req,env){
  if(m==='GET'&&(x=p.match(/^\/api\/admin\/novels\/(\d+)\/manuscript$/))){
   const user=await author(db,req);
   if(!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME)failure(403,'ส่งออกต้นฉบับได้เฉพาะผู้ดูแล');
-  const novelId=integer(x[1]),book=await own(db,novelId,user);
+  const novelId=integer(x[1]);
+  let book;
+  try{book=await own(db,novelId,user);}
+  catch(e){if(e.status)throw e;console.error('MANUSCRIPT_EXPORT_NOVEL_FAILED',String(e));throw Object.assign(new Error('MANUSCRIPT_EXPORT_NOVEL_FAILED'),{code:'MANUSCRIPT_EXPORT_NOVEL_FAILED'});}
   const selected=u.searchParams.get('chapter');
   let chapters;
   if(selected!==null){
@@ -233,7 +236,8 @@ async function api(req,env){
    if(startRaw!==null||countRaw!==null){
     const start=Number(startRaw),count=Number(countRaw);
     if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>20)failure(400,'ช่วงตอนต้องเริ่มตั้งแต่ 1 และส่งออกได้ไม่เกิน 20 ตอนต่อไฟล์');
-    chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC,id ASC LIMIT ? OFFSET ?',count,start-1);
+    try{chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC,id ASC LIMIT ? OFFSET ?',novelId,count,start-1);}
+    catch(e){console.error('MANUSCRIPT_EXPORT_READ_FAILED','batch',count,String(e));throw Object.assign(new Error('MANUSCRIPT_EXPORT_READ_FAILED'),{code:'MANUSCRIPT_EXPORT_READ_FAILED'});}
    }else{
     chapters=await rows(db,'SELECT id,title,body,position FROM chapters WHERE novel_id=? ORDER BY position ASC,id ASC',novelId);
    }
@@ -248,7 +252,7 @@ async function api(req,env){
    const filename='attachment; filename="aksaralai-manuscript.'+exportFormat+'"; filename*=UTF-8\'\''+encodeURIComponent(safeName);
    let body;
    try{body=exportFormat==='docx'?makeDocx(title,chapters):makePlainText(title,chapters);}
-   catch(e){console.error('MANUSCRIPT_EXPORT_BUILD_FAILED',exportFormat,'chapters',chapters.length,'characters',chapters.reduce((n,c)=>n+(c.body||'').length,0),String(e));failure(500,'MANUSCRIPT_EXPORT_BUILD_FAILED');}
+   catch(e){console.error('MANUSCRIPT_EXPORT_BUILD_FAILED',exportFormat,'chapters',chapters.length,'characters',chapters.reduce((n,c)=>n+(c.body||'').length,0),String(e));throw Object.assign(new Error('MANUSCRIPT_EXPORT_BUILD_FAILED'),{code:'MANUSCRIPT_EXPORT_BUILD_FAILED'});}
    return new Response(body,{status:200,headers:{
     'content-type':exportFormat==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'text/plain; charset=utf-8',
     'content-disposition':filename,
@@ -810,7 +814,7 @@ export default {async fetch(req,env){
    if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
    if(req.headers.get('sec-fetch-site')==='cross-site')return reply({detail:'Forbidden site'},403);
   }
-  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:e.message==='MANUSCRIPT_EXPORT_BUILD_FAILED'?'MANUSCRIPT_EXPORT_BUILD_FAILED':['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
+  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['MANUSCRIPT_EXPORT_NOVEL_FAILED','MANUSCRIPT_EXPORT_READ_FAILED','MANUSCRIPT_EXPORT_BUILD_FAILED'].includes(e.code)?e.code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
  }
  if(!['GET','HEAD'].includes(m))return new Response('Method not allowed',{status:405});
  if(!env.ASSETS)return new Response('Missing static assets binding',{status:503});
