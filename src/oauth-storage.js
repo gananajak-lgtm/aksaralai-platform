@@ -1,3 +1,4 @@
+import {verifyPkce} from './oauth-pkce.js';
 // One-time authorization code redemption primitives. Caller must authenticate
 // the client, validate redirect_uri and PKCE, and issue a token separately.
 export async function consumeAuthorizationCode(db,codeHash,clientId,now) {
@@ -8,6 +9,17 @@ export async function consumeAuthorizationCode(db,codeHash,clientId,now) {
  ).bind(now,codeHash,clientId,now).run();
  if(changed.meta?.changes!==1)return null;
  return db.prepare('SELECT user_id,client_id,redirect_uri,code_challenge,scope FROM oauth_authorization_codes WHERE code_hash=? AND consumed_at=?').bind(codeHash,now).first();
+}
+// Validate binding and PKCE before the atomic consume. Invalid verifiers do not burn a grant.
+export async function redeemAuthorizationCode(db,{codeHash,clientId,redirectUri,verifier,now}) {
+ if(typeof codeHash!=='string'||!/^[a-f0-9]{64}$/.test(codeHash)||
+    typeof clientId!=='string'||!clientId||typeof redirectUri!=='string'||
+    !Number.isSafeInteger(now))return null;
+ const grant=await db.prepare(
+  "SELECT client_id,redirect_uri,code_challenge FROM oauth_authorization_codes WHERE code_hash=? AND client_id=? AND consumed_at IS NULL AND expires_at>? AND scope='novels:read'"
+ ).bind(codeHash,clientId,now).first();
+ if(!grant||grant.redirect_uri!==redirectUri||!await verifyPkce(verifier,grant.code_challenge))return null;
+ return consumeAuthorizationCode(db,codeHash,clientId,now);
 }
 export async function lookupAccessToken(db,tokenHash,now) {
  if(typeof tokenHash!=='string'||!/^[a-f0-9]{64}$/.test(tokenHash)||!Number.isSafeInteger(now))return null;
