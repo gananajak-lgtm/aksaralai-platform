@@ -33,3 +33,9 @@ test('MCP negotiates JSON and rejects unsupported accept headers',()=>{
  assert.match(block,/headers\.get\('accept'\)/);
  assert.match(block,/failure\(406/);
 });
+
+test('MCP JSON-RPC rejects null IDs and identified notifications',()=>{
+ const block=source.slice(source.indexOf("if(p==='/api/mcp'&&m==='POST')"),source.indexOf(' // Read-only AI Bridge endpoints.'));
+ assert.match(block,/isNotification&&id!==undefined/);
+ assert.match(block,/id===undefined\|\|id===null/);
+});
