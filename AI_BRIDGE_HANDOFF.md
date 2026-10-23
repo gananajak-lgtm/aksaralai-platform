@@ -20,3 +20,8 @@ These routes are not yet an MCP server and cannot be invoked directly by ChatGPT
 5. End-to-end connection test from ChatGPT, with explicit account authorization.
 
 Never enable anonymous manuscript reads, reuse a user's browser session as an external integration secret, or permit writes without separate approval.
+
+## 2026-10-23 hardening
+- Commit 6988b95: strict positive integer validation for read pagination; SQL-level search excerpts avoid transferring full chapter bodies for searches.
+- Deployment and live authenticated end-to-end tests remain unverified.
+- OAuth/MCP are not yet implemented; do not claim ChatGPT can connect to the novel directly.
