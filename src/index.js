@@ -583,6 +583,32 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // Read-only AI Bridge endpoints. Require the writer's existing authenticated session.
+ // No manuscript is exposed anonymously, and responses are deliberately bounded.
+ if(m==='GET'&&p==='/api/bridge/novels'){
+  const actor=await author(db,req);
+  return reply({novels:await rows(db,'SELECT id,title,summary,updated_at FROM novels WHERE author_id=? ORDER BY updated_at DESC LIMIT 100',actor.id)});
+ }
+ if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/chapters$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  return reply({chapters:await rows(db,'SELECT id,title,position,updated_at FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT 500',nid)});
+ }
+ if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/read$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const start=Number(u.searchParams.get('start')||1),count=Number(u.searchParams.get('count')||1);
+  if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)failure(400,'อ่านได้ครั้งละ 1–5 ตอน และ start ต้องมากกว่า 0');
+  const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',count,start-1);
+  // Bound payload size to avoid overflowing model context and Worker memory.
+  if(chapters.reduce((sum,c)=>sum+(c.body?.length||0),0)>100000)failure(413,'ช่วงตอนยาวเกินไป กรุณาลดจำนวนตอน');
+  return reply({novel_id:nid,start,count:chapters.length,chapters});
+ }
+ if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/search$/))){
+  const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
+  const term=u.searchParams.get('q')||'';
+  if(term.length<2||term.length>100)failure(400,'คำค้นต้องยาว 2–100 ตัวอักษร');
+  const matches=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? AND instr(body,?)>0 ORDER BY position,id LIMIT 50',nid,term);
+  return reply({novel_id:nid,query:term,results:matches.map(c=>{const at=c.body.indexOf(term);return {chapter_id:c.id,title:c.title,position:c.position,excerpt:c.body.slice(Math.max(0,at-100),Math.min(c.body.length,at+term.length+100))};})});
+ }
  // Owner-only readiness checks; no manuscript content or database error details.
  if(m==='GET'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-diagnostics$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
