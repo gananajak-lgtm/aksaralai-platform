@@ -595,7 +595,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
  }
  if(m==='GET'&&(x=p.match(/^\/api\/bridge\/novels\/(\d+)\/read$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
-  const start=Number(u.searchParams.get('start')||1),count=Number(u.searchParams.get('count')||1);
+  const startText=u.searchParams.get('start')??'1',countText=u.searchParams.get('count')??'1';
+  if(!/^[1-9][0-9]*$/.test(startText)||!/^[1-9][0-9]*$/.test(countText))failure(400,'ช่วงตอนต้องเป็นจำนวนเต็มบวก');
+  const start=Number(startText),count=Number(countText);
   if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)failure(400,'อ่านได้ครั้งละ 1–5 ตอน และ start ต้องมากกว่า 0');
   const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',count,start-1);
   // Bound payload size to avoid overflowing model context and Worker memory.
@@ -606,8 +608,8 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
   const term=u.searchParams.get('q')||'';
   if(term.length<2||term.length>100)failure(400,'คำค้นต้องยาว 2–100 ตัวอักษร');
-  const matches=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? AND instr(body,?)>0 ORDER BY position,id LIMIT 50',nid,term);
-  return reply({novel_id:nid,query:term,results:matches.map(c=>{const at=c.body.indexOf(term);return {chapter_id:c.id,title:c.title,position:c.position,excerpt:c.body.slice(Math.max(0,at-100),Math.min(c.body.length,at+term.length+100))};})});
+  const matches=await rows(db,'SELECT id,title,position,substr(body,max(1,instr(body,?)-100),length(?)+200) AS excerpt FROM chapters WHERE novel_id=? AND instr(body,?)>0 ORDER BY position,id LIMIT 50',term,term,nid,term);
+  return reply({novel_id:nid,query:term,results:matches.map(c=>({chapter_id:c.id,title:c.title,position:c.position,excerpt:c.excerpt}))});
  }
  // Owner-only readiness checks; no manuscript content or database error details.
  if(m==='GET'&&(x=p.match(/^\/api\/writer\/novels\/(\d+)\/replace-diagnostics$/))){
