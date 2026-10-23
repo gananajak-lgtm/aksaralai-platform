@@ -39,3 +39,9 @@ test('MCP JSON-RPC rejects null IDs and identified notifications',()=>{
  assert.match(block,/isNotification&&id!==undefined/);
  assert.match(block,/id===undefined\|\|id===null/);
 });
+
+test('unfinished MCP endpoint is disabled by default',()=>{
+ const block=source.slice(source.indexOf("if(p==='/api/mcp'&&m==='POST')"),source.indexOf(' // Read-only AI Bridge endpoints.'));
+ assert.match(block,/AKSARALAI_MCP_ENABLED/);
+ assert.match(block,/failure\(503,'MCP connector is not enabled'\)/);
+});
