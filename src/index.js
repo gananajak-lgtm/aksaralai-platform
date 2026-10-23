@@ -1,4 +1,6 @@
 import {makeDocx,makePlainText} from './manuscript-export.js';
+import {resolveMcpWriter} from './mcp-auth.js';
+import {authenticateOAuthBearer} from './oauth-bearer.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -595,7 +597,8 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   // Until OAuth is available, MCP must not accept browser cookies as remote credentials.
   // Keeping this endpoint disabled prevents cross-origin clients from using ambient sessions.
   if(env.AKSARALAI_MCP_ENABLED!=='true')failure(503,'MCP connector is not enabled');
-  const actor=await author(db,req);
+  const actor=await resolveMcpWriter(db,req,clock(),authenticateOAuthBearer);
+  if(!actor)failure(401,'MCP requires OAuth authorization');
   const accept=req.headers.get('accept')||'';
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
   const d=await payload(req);
