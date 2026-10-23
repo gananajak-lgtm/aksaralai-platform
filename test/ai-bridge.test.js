@@ -27,3 +27,9 @@ test('MCP initialization rejects unsupported protocol versions',()=>{
  assert.match(block,/requested!=='2025-03-26'/);
  assert.match(block,/d\.method==='ping'/);
 });
+
+test('MCP negotiates JSON and rejects unsupported accept headers',()=>{
+ const block=source.slice(source.indexOf("if(p==='/api/mcp'&&m==='POST')"),source.indexOf(' // Read-only AI Bridge endpoints.'));
+ assert.match(block,/headers\.get\('accept'\)/);
+ assert.match(block,/failure\(406/);
+});
