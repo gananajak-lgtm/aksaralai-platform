@@ -89,3 +89,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commits 2be8e91, 21e1e87, e238fe3 and a90a333: MCP now resolves a writer using explicit OAuth Bearer grants and never authenticates from browser session cookies. Added unit tests and updated static regression checks.
 - OAuth token issuance, user consent and client registration remain incomplete. MCP remains default-disabled behind AKSARALAI_MCP_ENABLED. Do not enable it yet.
 - GitHub CI/deployment status and authenticated live integration remain unverified for these commits.
+
+## Registered OAuth consent validation (2026-10-23)
+- Commit b63185f adds src/oauth-consent.js, a pure preparation helper that looks up registered clients, parses their allowed redirect URIs and validates PKCE, scope, state and callback with existing authorization validation.
+- Commit 0fa9f9f adds unit tests for registered and unknown clients, redirect mismatch, malformed registration, scope and state.
+- No authorization UI or OAuth HTTP routes are exposed yet; no code or token is issued. MCP remains disabled by default.
+- CI and live deployment for these commits have not been verified.
