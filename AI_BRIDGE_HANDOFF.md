@@ -95,3 +95,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 0fa9f9f adds unit tests for registered and unknown clients, redirect mismatch, malformed registration, scope and state.
 - No authorization UI or OAuth HTTP routes are exposed yet; no code or token is issued. MCP remains disabled by default.
 - CI and live deployment for these commits have not been verified.
+
+## OAuth consent preview (2026-10-23)
+- Commit 8115ec9 adds a Thai-language, escaped HTML consent preview with explicit read-only scope and registered redirect destination. It deliberately has no approval button or token issuance.
+- Commit deaaf21 adds tests for XSS escaping, read-only display, absence of approval actions, and refusal of unvalidated input.
+- Still not routed through Worker HTTP and not production-ready. Next: authenticated authorization endpoint, CSRF-protected explicit user approval, short-lived one-time authorization code, PKCE token exchange, and revocation.
+- CI and deployment remain unverified; do not enable MCP.
