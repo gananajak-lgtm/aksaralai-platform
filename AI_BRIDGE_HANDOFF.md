@@ -62,3 +62,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 16ed9da: RFC 7636 vector and redirect validation tests.
 - No OAuth token endpoint, consent screen, or external account connection exists yet. Keep MCP disabled.
 - Next: authorization code persistence, consent, token lifecycle, bearer authentication, HTTP integration tests, CI and deployment verification.
+
+## OAuth authorization request validation (2026-10-23)
+- Commit 2ea0e66: src/oauth-authorization.js validates registered client ID, exact allowlisted redirect URI, authorization-code response type, S256 PKCE, read-only novels:read scope and state; constructs authorization redirects only from validated grants.
+- Commit b37baa8: test/oauth-authorization.test.js covers valid requests, unsafe redirects, wrong client, expanded scope, missing state and plain PKCE.
+- These are isolated pure helpers, NOT live OAuth endpoints. Next: persistent client registry, consent UI, one-time authorization code storage/atomic redemption, hashed access tokens, expiration and revocation; then MCP bearer auth and end-to-end tests.
+- Keep AKSARALAI_MCP_ENABLED unset until OAuth is complete. CI/deploy not verified.
