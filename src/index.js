@@ -591,7 +591,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
  }
  if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/chapters$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
-  return reply({chapters:await rows(db,'SELECT id,title,position,updated_at FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT 500',nid)});
+  return reply({chapters:await rows(db,'SELECT id,title,position FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT 500',nid)});
  }
  if(m==='GET'&&(x=p.match(/^\\/api\\/bridge\\/novels\\/(\\d+)\\/read$/))){
   const actor=await author(db,req),nid=integer(x[1]);await own(db,nid,actor);
