@@ -74,3 +74,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit cf519b2: src/oauth-storage.js adds atomic compare-and-set one-time code consumption, access-token lookup and revocation helpers.
 - CRITICAL: These helpers are NOT connected to any public routes. Authorization-code redemption MUST validate client ID, exact redirect URI and PKCE verifier before consuming a code and issuing a token; implement carefully to avoid denial of service or replay. OAuth migration has not been verified against production D1; inspect migration numbering before deployment. Do not enable MCP yet.
 - Next: unit/integration tests, verified migration sequence, consent UI, safe authorization/token flow and bearer-token auth; verify CI and deployment.
+
+## OAuth code redemption validation (2026-10-23)
+- Commit c5e7946: redeemAuthorizationCode validates client, redirect URI and PKCE S256 before atomic single-use consumption.
+- Commits 6ac3521 and c75c1e6: mocked D1 unit tests for successful redemption, replay prevention, invalid verifier/client/redirect and token revocation.
+- IMPORTANT: OAuth routes, consent, client registration, token issuance and MCP bearer auth are NOT implemented. CI and D1 migration status are unverified. Keep MCP disabled until full end-to-end authorization tests pass.
