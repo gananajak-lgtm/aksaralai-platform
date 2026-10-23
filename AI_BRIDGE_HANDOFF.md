@@ -41,3 +41,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 142f58e rejects unsupported MCP versions and non-integer numeric JSON-RPC IDs.
 - Commit 22793eb adds test/ai-bridge.test.js with static security/protocol regression assertions. These do not substitute for mocked D1 HTTP tests or live MCP client integration tests.
 - CI and deployment are not confirmed in this chat. Next: run npm test and node --check; add real HTTP integration tests, then OAuth 2.1 PKCE and remote MCP transport verification.
+
+## 2026-10-23 JSON negotiation
+- Commit 735e71e: MCP endpoint checks Accept for application/json or */* and rejects unsupported representations with HTTP 406.
+- Commit 97ac2a0: static regression test for this negotiation guard.
+- This is not a complete MCP Streamable HTTP transport: still requires standards-based OAuth authorization and verified remote client integration. CI/deploy not independently confirmed.
