@@ -53,3 +53,8 @@ test('manuscript export classifies build failures without exposing content',()=>
  assert.match(source,/MANUSCRIPT_EXPORT_BUILD_FAILED/);
  assert.match(source,/catch\(e\)\{console\.error\('MANUSCRIPT_EXPORT_BUILD_FAILED'/);
 });
+
+test('batch manuscript export binds novel id, count, and offset',()=>{
+ assert.match(source,/LIMIT \? OFFSET \?',novelId,count,start-1\)/);
+ assert.match(source,/MANUSCRIPT_EXPORT_READ_FAILED/);
+});
