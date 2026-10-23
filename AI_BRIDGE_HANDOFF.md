@@ -84,3 +84,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 72a6e1a adds src/oauth-bearer.js: strict Bearer parsing, SHA-256 token hashing, active read-only token lookup without cookie fallback.
 - Commit faa4557 adds test/oauth-bearer.test.js for parsing, hashing, DB lookup, scope rejection.
 - Not wired into /api/mcp yet. OAuth consent, issuance, client registry and full token lifecycle are incomplete. Keep AKSARALAI_MCP_ENABLED unset. CI, migration and deploy not verified.
+
+## MCP bearer-only route (2026-10-23)
+- Commits 2be8e91, 21e1e87, e238fe3 and a90a333: MCP now resolves a writer using explicit OAuth Bearer grants and never authenticates from browser session cookies. Added unit tests and updated static regression checks.
+- OAuth token issuance, user consent and client registration remain incomplete. MCP remains default-disabled behind AKSARALAI_MCP_ENABLED. Do not enable it yet.
+- GitHub CI/deployment status and authenticated live integration remain unverified for these commits.
