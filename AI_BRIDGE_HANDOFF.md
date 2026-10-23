@@ -25,3 +25,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 6988b95: strict positive integer validation for read pagination; SQL-level search excerpts avoid transferring full chapter bodies for searches.
 - Deployment and live authenticated end-to-end tests remain unverified.
 - OAuth/MCP are not yet implemented; do not claim ChatGPT can connect to the novel directly.
+
+## 2026-10-23 MCP foundation
+- Commit 5caa526: POST /api/mcp implements initialize, notifications/initialized, tools/list and tools/call for four read-only tools, with existing writer session and per-novel ownership checks.
+- This is a JSON-RPC foundation, not a verified interoperable remote MCP implementation. Protocol compliance, streaming transport, OAuth 2.1 and ChatGPT account connection are outstanding.
+- Never paste session cookies into ChatGPT or expose the MCP endpoint anonymously.
+- Run node --check, npm test, and authenticated end-to-end tests before treating this as production-ready.
