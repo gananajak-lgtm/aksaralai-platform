@@ -591,7 +591,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
   const d=await payload(req);
   const id=d.id;
-  if(d.method!=='notifications/initialized'&&id===undefined)failure(400,'MCP request id required');
+  const isNotification=d.method==='notifications/initialized';
+  if(isNotification&&id!==undefined)failure(400,'MCP notifications must not include an id');
+  if(!isNotification&&(id===undefined||id===null))failure(400,'MCP request id required');
   if(d.jsonrpc!=='2.0'||typeof d.method!=='string'||(id!==undefined&&(typeof id!=='string'&&(!Number.isSafeInteger(id)))))failure(400,'คำขอ MCP ไม่ถูกต้อง');
   const result=value=>reply({jsonrpc:'2.0',id:id??null,result:value});
   const err=(code,message)=>reply({jsonrpc:'2.0',id:id??null,error:{code,message}});
