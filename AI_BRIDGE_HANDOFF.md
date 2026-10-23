@@ -51,3 +51,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 93f7ba8 rejects null request IDs and notifications that incorrectly include IDs.
 - Commit 41e0975 adds a static regression assertion.
 - GitHub combined commit status returned no status contexts for 41e0975; no claim of passing CI or deployment. OAuth and remote MCP connection remain outstanding.
+
+## 2026-10-23 MCP safety gate
+- Commit c11acb0: /api/mcp returns 503 unless AKSARALAI_MCP_ENABLED is explicitly set to string 'true'. This variable MUST remain unset in production until OAuth and protocol conformance are completed.
+- Commit 487fd3b: static regression assertion for default-disabled gate.
+- This does not implement OAuth or permit direct ChatGPT access. Do not enable the gate with cookie authentication as a substitute for OAuth.
