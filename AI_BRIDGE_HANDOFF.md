@@ -56,3 +56,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit c11acb0: /api/mcp returns 503 unless AKSARALAI_MCP_ENABLED is explicitly set to string 'true'. This variable MUST remain unset in production until OAuth and protocol conformance are completed.
 - Commit 487fd3b: static regression assertion for default-disabled gate.
 - This does not implement OAuth or permit direct ChatGPT access. Do not enable the gate with cookie authentication as a substitute for OAuth.
+
+## OAuth PKCE foundation (2026-10-23)
+- 4b58197: isolated PKCE S256 verification and exact redirect allowlist module.
+- 16ed9da: RFC 7636 vector and redirect validation tests.
+- No OAuth token endpoint, consent screen, or external account connection exists yet. Keep MCP disabled.
+- Next: authorization code persistence, consent, token lifecycle, bearer authentication, HTTP integration tests, CI and deployment verification.
