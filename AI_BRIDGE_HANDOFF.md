@@ -46,3 +46,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 735e71e: MCP endpoint checks Accept for application/json or */* and rejects unsupported representations with HTTP 406.
 - Commit 97ac2a0: static regression test for this negotiation guard.
 - This is not a complete MCP Streamable HTTP transport: still requires standards-based OAuth authorization and verified remote client integration. CI/deploy not independently confirmed.
+
+## 2026-10-23 JSON-RPC ID correctness
+- Commit 93f7ba8 rejects null request IDs and notifications that incorrectly include IDs.
+- Commit 41e0975 adds a static regression assertion.
+- GitHub combined commit status returned no status contexts for 41e0975; no claim of passing CI or deployment. OAuth and remote MCP connection remain outstanding.
