@@ -583,6 +583,51 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   const r=await run(db,'INSERT INTO chapters(novel_id,title,body,position,created_at) VALUES(?,?,?,?,?)',nid,d.title,d.body,pos,clock());
   await run(db,'UPDATE novels SET updated_at=? WHERE id=?',clock(),nid);return reply({id:r.meta.last_row_id},201);
  }
+ // MCP JSON-RPC foundation. Session-authenticated only until OAuth is implemented.
+ // No external ChatGPT connection is enabled by this endpoint yet.
+ if(p==='/api/mcp'&&m==='POST'){
+  const actor=await author(db,req),d=await payload(req);
+  const id=d.id;
+  if(d.jsonrpc!=='2.0'||typeof d.method!=='string'||(id!==undefined&&typeof id!=='string'&&typeof id!=='number'))failure(400,'คำขอ MCP ไม่ถูกต้อง');
+  const result=value=>reply({jsonrpc:'2.0',id:id??null,result:value});
+  const err=(code,message)=>reply({jsonrpc:'2.0',id:id??null,error:{code,message}});
+  if(d.method==='initialize')return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'aksaralai-readonly',version:'0.1.0'}});
+  if(d.method==='notifications/initialized')return new Response(null,{status:202});
+  const specs=[
+   {name:'list_novels',description:'List novels owned by the signed-in writer',inputSchema:{type:'object',properties:{},additionalProperties:false}},
+   {name:'list_chapters',description:'List chapter titles and positions for an owned novel',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1}},required:['novel_id'],additionalProperties:false}},
+   {name:'read_chapters',description:'Read 1 to 5 chapters, maximum 100000 characters',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},start:{type:'integer',minimum:1},count:{type:'integer',minimum:1,maximum:5}},required:['novel_id','start','count'],additionalProperties:false}},
+   {name:'search_novel',description:'Find short excerpts containing a literal search term',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},query:{type:'string',minLength:2,maxLength:100}},required:['novel_id','query'],additionalProperties:false}}
+  ];
+  if(d.method==='tools/list')return result({tools:specs});
+  if(d.method!=='tools/call')return err(-32601,'Method not found');
+  const name=d.params?.name,args=d.params?.arguments;
+  if(!specs.some(t=>t.name===name)||!args||typeof args!=='object'||Array.isArray(args))return err(-32602,'Invalid tool arguments');
+  const keys=Object.keys(args),allowed={list_novels:[],list_chapters:['novel_id'],read_chapters:['novel_id','start','count'],search_novel:['novel_id','query']}[name];
+  if(keys.some(k=>!allowed.includes(k)))return err(-32602,'Unknown tool argument');
+  let data;
+  if(name==='list_novels')data={novels:await rows(db,'SELECT id,title,summary,updated_at FROM novels WHERE author_id=? ORDER BY updated_at DESC LIMIT 100',actor.id)};
+  else{
+   const nid=args.novel_id;
+   if(!Number.isSafeInteger(nid)||nid<1)return err(-32602,'Invalid novel_id');
+   await own(db,nid,actor);
+   if(name==='list_chapters')data={chapters:await rows(db,'SELECT id,title,position FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT 500',nid)};
+   if(name==='read_chapters'){
+    const start=args.start,count=args.count;
+    if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)return err(-32602,'Invalid chapter range');
+    const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',count,start-1);
+    if(chapters.reduce((n,c)=>n+(c.body?.length||0),0)>100000)return err(-32602,'Chapter range exceeds 100000 characters');
+    data={novel_id:nid,start,chapters};
+   }
+   if(name==='search_novel'){
+    const term=args.query;
+    if(typeof term!=='string'||term.length<2||term.length>100)return err(-32602,'Invalid search query');
+    const found=await rows(db,'SELECT id,title,position,substr(body,max(1,instr(body,?)-100),length(?)+200) AS excerpt FROM chapters WHERE novel_id=? AND instr(body,?)>0 ORDER BY position,id LIMIT 50',term,term,nid,term);
+    data={novel_id:nid,query:term,results:found.map(c=>({chapter_id:c.id,title:c.title,position:c.position,excerpt:c.excerpt}))};
+   }
+  }
+  return result({content:[{type:'text',text:JSON.stringify(data)}],isError:false});
+ }
  // Read-only AI Bridge endpoints. Require the writer's existing authenticated session.
  // No manuscript is exposed anonymously, and responses are deliberately bounded.
  if(m==='GET'&&p==='/api/bridge/novels'){
