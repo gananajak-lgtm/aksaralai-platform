@@ -586,6 +586,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
  // MCP JSON-RPC foundation. Session-authenticated only until OAuth is implemented.
  // No external ChatGPT connection is enabled by this endpoint yet.
  if(p==='/api/mcp'&&m==='POST'){
+  // Until OAuth is available, MCP must not accept browser cookies as remote credentials.
+  // Keeping this endpoint disabled prevents cross-origin clients from using ambient sessions.
+  if(env.AKSARALAI_MCP_ENABLED!=='true')failure(503,'MCP connector is not enabled');
   const actor=await author(db,req);
   const accept=req.headers.get('accept')||'';
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
