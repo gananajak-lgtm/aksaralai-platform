@@ -68,3 +68,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit b37baa8: test/oauth-authorization.test.js covers valid requests, unsafe redirects, wrong client, expanded scope, missing state and plain PKCE.
 - These are isolated pure helpers, NOT live OAuth endpoints. Next: persistent client registry, consent UI, one-time authorization code storage/atomic redemption, hashed access tokens, expiration and revocation; then MCP bearer auth and end-to-end tests.
 - Keep AKSARALAI_MCP_ENABLED unset until OAuth is complete. CI/deploy not verified.
+
+## OAuth D1 persistence groundwork (2026-10-23)
+- Migration migrations/0008_oauth_readonly.sql (38fe408, fixed SQL comment syntax 3e8eba7): registered clients, SHA-256-hashed authorization codes and access tokens, expiry/consumption/revocation fields, novels:read-only scope.
+- Commit cf519b2: src/oauth-storage.js adds atomic compare-and-set one-time code consumption, access-token lookup and revocation helpers.
+- CRITICAL: These helpers are NOT connected to any public routes. Authorization-code redemption MUST validate client ID, exact redirect URI and PKCE verifier before consuming a code and issuing a token; implement carefully to avoid denial of service or replay. OAuth migration has not been verified against production D1; inspect migration numbering before deployment. Do not enable MCP yet.
+- Next: unit/integration tests, verified migration sequence, consent UI, safe authorization/token flow and bearer-token auth; verify CI and deployment.
