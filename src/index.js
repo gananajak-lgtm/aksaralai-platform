@@ -588,10 +588,15 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
  if(p==='/api/mcp'&&m==='POST'){
   const actor=await author(db,req),d=await payload(req);
   const id=d.id;
+  if(d.method!=='notifications/initialized'&&id===undefined)failure(400,'MCP request id required');
   if(d.jsonrpc!=='2.0'||typeof d.method!=='string'||(id!==undefined&&typeof id!=='string'&&typeof id!=='number'))failure(400,'คำขอ MCP ไม่ถูกต้อง');
   const result=value=>reply({jsonrpc:'2.0',id:id??null,result:value});
   const err=(code,message)=>reply({jsonrpc:'2.0',id:id??null,error:{code,message}});
-  if(d.method==='initialize')return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'aksaralai-readonly',version:'0.1.0'}});
+  if(d.method==='initialize'){
+   const requested=d.params?.protocolVersion;
+   if(typeof requested!=='string')return err(-32602,'Missing protocol version');
+   return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'aksaralai-readonly',version:'0.1.0'}});
+  }
   if(d.method==='notifications/initialized')return new Response(null,{status:202});
   const specs=[
    {name:'list_novels',description:'List novels owned by the signed-in writer',inputSchema:{type:'object',properties:{},additionalProperties:false}},
@@ -599,6 +604,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
    {name:'read_chapters',description:'Read 1 to 5 chapters, maximum 100000 characters',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},start:{type:'integer',minimum:1},count:{type:'integer',minimum:1,maximum:5}},required:['novel_id','start','count'],additionalProperties:false}},
    {name:'search_novel',description:'Find short excerpts containing a literal search term',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},query:{type:'string',minLength:2,maxLength:100}},required:['novel_id','query'],additionalProperties:false}}
   ];
+  if(d.method==='ping')return result({});
   if(d.method==='tools/list')return result({tools:specs});
   if(d.method!=='tools/call')return err(-32601,'Method not found');
   const name=d.params?.name,args=d.params?.arguments;
