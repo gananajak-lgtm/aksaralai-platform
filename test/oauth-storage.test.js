@@ -13,7 +13,7 @@ function fakeDB(){
   return {bind(...args){return {
    async first(){
     if(sql.includes('oauth_authorization_codes')){
-     if(state.consumed)return null;
+     if(state.consumed&&!sql.includes('consumed_at=?'))return null;
      if(sql.includes('expires_at')&&args[1]!=='client-1')return null;
      return grant;
     }
