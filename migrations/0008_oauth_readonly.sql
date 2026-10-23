@@ -1,5 +1,5 @@
-// Database schema only: OAuth routes and token issuance remain disabled.
-// Never store raw authorization codes or access tokens.
+-- Database schema only: OAuth routes and token issuance remain disabled.
+-- Never store raw authorization codes or access tokens.
 CREATE TABLE IF NOT EXISTS oauth_clients (
  client_id TEXT PRIMARY KEY,
  display_name TEXT NOT NULL,
