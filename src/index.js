@@ -3,6 +3,8 @@ import {resolveMcpWriter} from './mcp-auth.js';
 import {authenticateOAuthBearer} from './oauth-bearer.js';
 import {prepareOAuthConsent} from './oauth-consent.js';
 import {renderOAuthConsent} from './oauth-consent-view.js';
+import {generateConsentNonce,hashConsentNonce} from './oauth-consent-nonce.js';
+import {hashConsentContext,storeBoundConsent} from './oauth-consent-binding.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -48,10 +50,17 @@ async function api(req,env){
  // Preview-only OAuth authorization screen. No consent or token issuance yet.
  if(p==='/api/oauth/authorize'&&m==='GET'){
   if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true')failure(503,'OAuth consent preview is not enabled');
-  await author(db,req);
+  const writer=await author(db,req);
   const params=Object.fromEntries(u.searchParams);
   const approved=await prepareOAuthConsent(db,params);
   if(!approved.ok)failure(400,'Invalid OAuth authorization request');
+  // Preview-only: issue a short-lived, session-bound challenge; never issue an OAuth grant.
+  const sessionToken=cookie(req);
+  if(!sessionToken)failure(401,'Writer session required');
+  const nonce=generateConsentNonce(),now=clock();
+  const nonceHash=await hashConsentNonce(nonce);
+  const contextHash=await hashConsentContext(approved,writer.id,await sha(sessionToken));
+  await storeBoundConsent(db,{nonceHash,contextHash,userId:writer.id,expiresAt:now+300,now});
   return new Response(renderOAuthConsent(approved),{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-frame-options':'DENY'}});
  }
  if(p==='/api/register'&&m==='POST'){
