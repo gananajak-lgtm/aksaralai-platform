@@ -113,3 +113,10 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 6b481b9 adds migration 0009_oauth_consent_nonces.sql; commit 97b80c0 adds unit tests.
 - These primitives are NOT yet wired to an authorization request or approval POST. They do not themselves provide full CSRF protection; the eventual flow must bind nonce to the precise OAuth request and browser session, verify Origin/CSRF, and obtain explicit consent before issuing one-time codes.
 - No migration application, CI pass, deployment, or live OAuth test verified. Keep OAuth and MCP disabled by default.
+
+## Consent request/session binding (2026-10-24)
+- Commit fdaaadb adds canonical SHA-256 consent context hashing across writer ID, session token hash, client ID, redirect URI, PKCE challenge, read-only scope and OAuth state; includes bound insert and atomic consume primitives.
+- Commit 0274f32 adds migration 0010_oauth_consent_binding.sql with context_hash column. Existing unbound nonce records must not be accepted by the new bound consume path.
+- Commit b899f74 adds tests for context changes, session changes, bound SQL and malformed input.
+- These helpers are not wired to the HTTP approval flow. Must ensure browser session binding, CSRF validation, explicit consent, one-time code issuance and transactional semantics before enabling.
+- CI, migration application and deployment remain unverified. Keep MCP/OAuth feature gates disabled.
