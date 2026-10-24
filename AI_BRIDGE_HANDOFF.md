@@ -120,3 +120,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit b899f74 adds tests for context changes, session changes, bound SQL and malformed input.
 - These helpers are not wired to the HTTP approval flow. Must ensure browser session binding, CSRF validation, explicit consent, one-time code issuance and transactional semantics before enabling.
 - CI, migration application and deployment remain unverified. Keep MCP/OAuth feature gates disabled.
+
+## OAuth authorization parameter ambiguity (2026-10-24)
+- Commit 7315a20 rejects duplicate query parameter names on GET /api/oauth/authorize before registered-client validation, preventing silent Object.fromEntries overwrites.
+- Commit 92bde50 adds static regression coverage.
+- A preliminary experiment to issue a nonce on the preview GET (ea87497) was immediately reverted in 6788fb0 because the preview has no usable approval form or POST endpoint; do not treat those ephemeral changes as an active consent workflow.
+- Next implement a real, session-bound consent form and POST flow with CSRF and one-time code issuance. MCP/OAuth gates remain disabled. CI/deployment not verified.
