@@ -50,6 +50,8 @@ async function api(req,env){
   if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true')failure(503,'OAuth consent preview is not enabled');
   await author(db,req);
   const params=Object.fromEntries(u.searchParams);
+  // Duplicate OAuth parameters are ambiguous and must never be silently overwritten.
+  if([...u.searchParams.keys()].length!==Object.keys(params).length)failure(400,'Duplicate OAuth parameter');
   const approved=await prepareOAuthConsent(db,params);
   if(!approved.ok)failure(400,'Invalid OAuth authorization request');
   return new Response(renderOAuthConsent(approved),{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-frame-options':'DENY'}});
