@@ -126,3 +126,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 92bde50 adds static regression coverage.
 - A preliminary experiment to issue a nonce on the preview GET (ea87497) was immediately reverted in 6788fb0 because the preview has no usable approval form or POST endpoint; do not treat those ephemeral changes as an active consent workflow.
 - Next implement a real, session-bound consent form and POST flow with CSRF and one-time code issuance. MCP/OAuth gates remain disabled. CI/deployment not verified.
+
+## OAuth consent decision redirect helper (2026-10-25)
+- Commit fdbb120 adds src/oauth-consent-decision.js for validated approval/denial callbacks; denial sends error=access_denied and state without a code, approval requires an externally issued well-formed code.
+- Commit 5c12f19 adds tests for state preservation, denial, approval, unsafe callbacks and conflicting query fields.
+- Helper is NOT wired to an HTTP approval/denial route and does not issue or persist authorization codes. Caller must revalidate the registered client, enforce explicit consent, browser session/CSRF binding, one-time nonce and code persistence before redirect.
+- CI, deployment and live OAuth integration remain unverified. Feature gates remain disabled.
