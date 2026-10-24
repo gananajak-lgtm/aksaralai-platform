@@ -1,6 +1,8 @@
 import {makeDocx,makePlainText} from './manuscript-export.js';
 import {resolveMcpWriter} from './mcp-auth.js';
 import {authenticateOAuthBearer} from './oauth-bearer.js';
+import {prepareOAuthConsent} from './oauth-consent.js';
+import {renderOAuthConsent} from './oauth-consent-view.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -43,6 +45,15 @@ function coverImageType(bytes,declared){
 async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
  if(!db)failure(503,'ยังไม่เชื่อมต่อฐานข้อมูล D1');
+ // Preview-only OAuth authorization screen. No consent or token issuance yet.
+ if(p==='/api/oauth/authorize'&&m==='GET'){
+  if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true')failure(503,'OAuth consent preview is not enabled');
+  await author(db,req);
+  const params=Object.fromEntries(u.searchParams);
+  const approved=await prepareOAuthConsent(db,params);
+  if(!approved.ok)failure(400,'Invalid OAuth authorization request');
+  return new Response(renderOAuthConsent(approved),{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-frame-options':'DENY'}});
+ }
  if(p==='/api/register'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',3,24),name=str(d,'display_name',1,50),password=str(d,'password',8,128);
   if(!/^[a-zA-Z0-9_]{3,24}$/.test(username)||!['reader','writer'].includes(d.role))failure(400,'บัญชีหรือบทบาทไม่ถูกต้อง');
