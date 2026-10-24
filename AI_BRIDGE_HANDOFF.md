@@ -107,3 +107,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 5d17241 adds static route regression tests. This route is preview-only: no approval form, no code issuance, no access token exchange, no live ChatGPT connection.
 - Do not enable preview without verifying deployment, migrations, tests, and registered OAuth clients. MCP remains default-disabled.
 - CI and production deployment are not independently verified.
+
+## One-time OAuth consent nonce groundwork (2026-10-24)
+- Commit eb8fe81 adds cryptographically random 256-bit consent nonces, SHA-256 hashing, and atomic user-bound, expiry-checked consume primitives.
+- Commit 6b481b9 adds migration 0009_oauth_consent_nonces.sql; commit 97b80c0 adds unit tests.
+- These primitives are NOT yet wired to an authorization request or approval POST. They do not themselves provide full CSRF protection; the eventual flow must bind nonce to the precise OAuth request and browser session, verify Origin/CSRF, and obtain explicit consent before issuing one-time codes.
+- No migration application, CI pass, deployment, or live OAuth test verified. Keep OAuth and MCP disabled by default.
