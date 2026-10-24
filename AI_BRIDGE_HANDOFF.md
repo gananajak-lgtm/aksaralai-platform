@@ -132,3 +132,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 5c12f19 adds tests for state preservation, denial, approval, unsafe callbacks and conflicting query fields.
 - Helper is NOT wired to an HTTP approval/denial route and does not issue or persist authorization codes. Caller must revalidate the registered client, enforce explicit consent, browser session/CSRF binding, one-time nonce and code persistence before redirect.
 - CI, deployment and live OAuth integration remain unverified. Feature gates remain disabled.
+
+## Explicit consent POST validation groundwork (2026-10-25)
+- Commit 4672c37 adds src/oauth-consent-submit.js to validate exactly {decision:'approve'|'deny',nonce:<43-char base64url>} and require an exact same-origin Origin header; cross-site Fetch Metadata is rejected.
+- Commit 0338c28 adds tests for valid/invalid decisions, missing/invalid nonce, missing/cross-site Origin and cross-site Fetch Metadata.
+- This is a standalone validation helper only. No POST /api/oauth/consent route exists, no browser form is enabled, and no authorization code is issued. Full CSRF defense still requires binding a generated nonce to the exact request, session and user, then consuming it atomically.
+- CI/deployment/migrations not verified. Keep OAuth and MCP feature gates disabled.
