@@ -101,3 +101,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit deaaf21 adds tests for XSS escaping, read-only display, absence of approval actions, and refusal of unvalidated input.
 - Still not routed through Worker HTTP and not production-ready. Next: authenticated authorization endpoint, CSRF-protected explicit user approval, short-lived one-time authorization code, PKCE token exchange, and revocation.
 - CI and deployment remain unverified; do not enable MCP.
+
+## Authenticated OAuth consent preview route (2026-10-24)
+- Commit c5ad1fa adds GET /api/oauth/authorize, gated by AKSARALAI_OAUTH_PREVIEW_ENABLED='true', existing authenticated writer session, registered client validation, and strict response security headers (CSP, no-store, no-referrer, no framing).
+- Commit 5d17241 adds static route regression tests. This route is preview-only: no approval form, no code issuance, no access token exchange, no live ChatGPT connection.
+- Do not enable preview without verifying deployment, migrations, tests, and registered OAuth clients. MCP remains default-disabled.
+- CI and production deployment are not independently verified.
