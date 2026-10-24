@@ -21,3 +21,9 @@ test('OAuth consent preview has restrictive browser security headers',()=>{
  assert.match(block,/referrer-policy':'no-referrer'/);
  assert.match(block,/cache-control':'no-store'/);
 });
+
+test('OAuth preview rejects duplicate query parameters before validation',()=>{
+ assert.match(block,/\[\.\.\.u\.searchParams\.keys\(\)\]\.length!==Object\.keys\(params\)\.length/);
+ assert.match(block,/failure\(400,'Duplicate OAuth parameter'\)/);
+ assert.ok(block.indexOf('Duplicate OAuth parameter')<block.indexOf('prepareOAuthConsent(db,params)'));
+});
