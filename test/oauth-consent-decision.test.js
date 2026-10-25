@@ -25,4 +25,5 @@ test('unvalidated, unsafe and conflicting callback URLs are rejected',()=>{
  assert.throws(()=>buildConsentDecisionRedirect({...approved,redirect_uri:'https://client.example/cb?code=old'},'deny'),TypeError);
  assert.throws(()=>buildConsentDecisionRedirect({...approved,redirect_uri:'https://client.example/cb#fragment'},'deny'),TypeError);
  assert.throws(()=>buildConsentDecisionRedirect({...approved,redirect_uri:'http://remote.example/cb'},'deny'),TypeError);
+ for(const key of ['error_description','error_uri'])assert.throws(()=>buildConsentDecisionRedirect({...approved,redirect_uri:'https://client.example/cb?'+key+'=injected'},'deny'),TypeError);
 });
