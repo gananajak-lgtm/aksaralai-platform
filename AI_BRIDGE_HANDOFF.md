@@ -144,3 +144,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 6811d47: callback redirect now rejects preexisting error_description and error_uri, alongside code, state, and error.
 - 2433ec0: regression tests for reserved OAuth error fields.
 - Not yet wired to HTTP consent form or POST route; no authorization code/token issuance. OAuth and MCP remain gated. CI and deployment unverified.
+
+## Consent form renderer (2026-10-25)
+- cc157e7 adds src/oauth-consent-form.js: a server-rendered form with explicit approve/deny buttons and a hidden 43-character nonce; HTML escaping protects client-provided text.
+- 1f4a088 adds tests for decisions, nonce validation and HTML escaping.
+- Not wired into GET /api/oauth/authorize or POST /api/oauth/consent. Do not enable OAuth/MCP until nonce issuance, session binding, one-time code issuance and token exchange are implemented and verified.
+- CI/deployment not verified.
