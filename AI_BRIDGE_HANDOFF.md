@@ -156,3 +156,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 44be383 adds static route tests for nonce/session binding and the independent feature gate.
 - AKSARALAI_OAUTH_CONSENT_FORM_ENABLED must remain unset/false until POST /api/oauth/consent is implemented, tested and deployed. AKSARALAI_OAUTH_PREVIEW_ENABLED remains the separate outer gate. No authorization code/token is issued yet.
 - CI, database migration status and deployment are not verified.
+
+## OAuth form request preservation (2026-10-25)
+- 0134bf7 and 05d948f: the consent form now includes hidden OAuth authorization request fields (response_type=code, client_id, redirect_uri, code_challenge, code_challenge_method=S256, scope, state), alongside the consent nonce and explicit decision. HTML attribute values are escaped.
+- f589f66 updates the form tests with a complete validated request and assertions for the hidden parameters.
+- The POST endpoint MUST independently revalidate these client-controlled fields against the registered client and verify the nonce's canonical context hash, authenticated user, and browser session before accepting a decision. Never trust hidden inputs as authorization by themselves.
+- POST consent handling, authorization code issuance and token exchange remain incomplete. Keep consent form/OAuth/MCP gates disabled. CI and deploy not verified.
