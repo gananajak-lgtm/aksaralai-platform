@@ -16,7 +16,7 @@ export function buildConsentDecisionRedirect(approved,decision,code){
  const target=checkedTarget(approved);
  // Prevent preexisting callback parameters from overriding OAuth response fields.
  if(target.searchParams.has('code')||target.searchParams.has('error')||
-    target.searchParams.has('state'))throw new TypeError('Conflicting callback parameters');
+    target.searchParams.has('state')||target.searchParams.has('error_description')||target.searchParams.has('error_uri'))throw new TypeError('Conflicting callback parameters');
  if(decision==='deny'){
   if(code!==undefined)throw new TypeError('Denied requests cannot carry codes');
   target.searchParams.set('error','access_denied');
