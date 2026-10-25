@@ -138,3 +138,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - Commit 0338c28 adds tests for valid/invalid decisions, missing/invalid nonce, missing/cross-site Origin and cross-site Fetch Metadata.
 - This is a standalone validation helper only. No POST /api/oauth/consent route exists, no browser form is enabled, and no authorization code is issued. Full CSRF defense still requires binding a generated nonce to the exact request, session and user, then consuming it atomically.
 - CI/deployment/migrations not verified. Keep OAuth and MCP feature gates disabled.
+
+## OAuth consent verification and callback hardening (2026-10-25)
+- 02f820b: standalone request/session-bound nonce verification helper; 9c8cc0e: replay and origin tests.
+- 6811d47: callback redirect now rejects preexisting error_description and error_uri, alongside code, state, and error.
+- 2433ec0: regression tests for reserved OAuth error fields.
+- Not yet wired to HTTP consent form or POST route; no authorization code/token issuance. OAuth and MCP remain gated. CI and deployment unverified.
