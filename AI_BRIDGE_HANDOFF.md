@@ -150,3 +150,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 1f4a088 adds tests for decisions, nonce validation and HTML escaping.
 - Not wired into GET /api/oauth/authorize or POST /api/oauth/consent. Do not enable OAuth/MCP until nonce issuance, session binding, one-time code issuance and token exchange are implemented and verified.
 - CI/deployment not verified.
+
+## Session-bound OAuth consent form GET (2026-10-25)
+- 2c9661f wires an independently gated consent form into GET /api/oauth/authorize. It requires an authenticated writer, validates client/redirect/PKCE, creates a random nonce, persists its hash and session-bound context hash with 300-second expiry, and renders approve/deny buttons.
+- 44be383 adds static route tests for nonce/session binding and the independent feature gate.
+- AKSARALAI_OAUTH_CONSENT_FORM_ENABLED must remain unset/false until POST /api/oauth/consent is implemented, tested and deployed. AKSARALAI_OAUTH_PREVIEW_ENABLED remains the separate outer gate. No authorization code/token is issued yet.
+- CI, database migration status and deployment are not verified.
