@@ -168,3 +168,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 7ad6537: verification compares posted request values with the independently validated OAuth request before nonce consumption.
 - 3bbc115 and 63ffe7c: update unit tests to send complete form fields.
 - Attempted POST /api/oauth/consent route update was blocked by connector safety controls. It has NOT been committed; no code issuance or denial route is live. Keep feature flags disabled. CI/deploy unverified.
+
+## AI rewrite input limit (2026-10-26)
+- 152861e raises POST /api/admin/rewrite-text input cap from 4,500 to 40,000 characters, raises requested output tokens to 16,384 and edited result character cap to 80,000.
+- 9a837f8 updates editor validation and clarifies that AI paragraph formatting remains limited to 4,500 characters.
+- ffc244d adds static regression tests for UI/API rewrite limits and separate formatter cap.
+- Important: A single gpt-4o-mini completion may not return a complete 40,000-character rewrite. End-to-end large-document testing and likely chunked rewrite processing are required before promising complete output. CI/deployment not verified.
