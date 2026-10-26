@@ -162,3 +162,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - f589f66 updates the form tests with a complete validated request and assertions for the hidden parameters.
 - The POST endpoint MUST independently revalidate these client-controlled fields against the registered client and verify the nonce's canonical context hash, authenticated user, and browser session before accepting a decision. Never trust hidden inputs as authorization by themselves.
 - POST consent handling, authorization code issuance and token exchange remain incomplete. Keep consent form/OAuth/MCP gates disabled. CI and deploy not verified.
+
+## Consent POST payload validation (2026-10-26)
+- 7d044df: require exact nine-field OAuth consent form payload (decision, nonce and seven OAuth authorization request parameters).
+- 7ad6537: verification compares posted request values with the independently validated OAuth request before nonce consumption.
+- 3bbc115 and 63ffe7c: update unit tests to send complete form fields.
+- Attempted POST /api/oauth/consent route update was blocked by connector safety controls. It has NOT been committed; no code issuance or denial route is live. Keep feature flags disabled. CI/deploy unverified.
