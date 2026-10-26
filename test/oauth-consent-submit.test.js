@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateConsentSubmission,verifyConsentOrigin} from '../src/oauth-consent-submit.js';
 const nonce='A'.repeat(43);
+const params={response_type:'code',client_id:'client',redirect_uri:'https://client.example/cb',code_challenge:'A'.repeat(43),code_challenge_method:'S256',scope:'novels:read',state:'s'.repeat(20)};
 test('consent requires explicit decision and a valid one-time nonce',()=>{
- assert.deepEqual(validateConsentSubmission({decision:'approve',nonce}),{ok:true,decision:'approve',nonce});
- assert.deepEqual(validateConsentSubmission({decision:'deny',nonce}),{ok:true,decision:'deny',nonce});
+ assert.deepEqual(validateConsentSubmission({...params,decision:'approve',nonce}),{ok:true,decision:'approve',nonce,params});
+ assert.deepEqual(validateConsentSubmission({...params,decision:'deny',nonce}),{ok:true,decision:'deny',nonce,params});
  for(const data of [{decision:'approve'}, {decision:'yes',nonce},{decision:'approve',nonce:'bad'}, {decision:'approve',nonce,extra:1},null,[]])
   assert.equal(validateConsentSubmission(data).ok,false);
 });
