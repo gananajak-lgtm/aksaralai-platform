@@ -151,14 +151,14 @@ async function api(req,env){
   const user=await author(db,req);
   if(!env.OPENAI_TTS_ADMIN_USERNAME||user.username!==env.OPENAI_TTS_ADMIN_USERNAME||!env.OPENAI_API_KEY)failure(403,'เครื่องมือแก้เนื้อหาด้วย AI สำหรับผู้ดูแลเท่านั้น');
   const d=await payload(req),original=d.text,instruction=d.instruction;
-  if(typeof original!=='string'||!original.trim()||original.length>4500)failure(400,'กรุณาเลือกข้อความไม่เกิน 4,500 ตัวอักษร');
+  if(typeof original!=='string'||!original.trim()||original.length>40000)failure(400,'กรุณาเลือกข้อความไม่เกิน 40,000 ตัวอักษร');
   if(typeof instruction!=='string'||instruction.trim().length<2||instruction.length>1000)failure(400,'กรุณาระบุคำสั่งแก้ไขไม่เกิน 1,000 ตัวอักษร');
   let response;
   try{
    response=await fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{authorization:'Bearer '+env.OPENAI_API_KEY,'content-type':'application/json'},
-    body:JSON.stringify({model:'gpt-4o-mini',temperature:0.3,max_tokens:12000,response_format:{type:'json_object'},messages:[
+    body:JSON.stringify({model:'gpt-4o-mini',temperature:0.3,max_tokens:16384,response_format:{type:'json_object'},messages:[
      {role:'system',content:'You are a Thai fiction editor. Reply as valid JSON with keys edited and summary. Revise only the supplied passage according to the writer request. Keep established names, facts, chronology, point of view and setting unless the writer explicitly asks to change them. Keep Thai language and return the complete revised passage in edited.'},
      {role:'user',content:'คำสั่งแก้ไข: '+instruction.trim()+'\n\nต้นฉบับ:\n'+original}
     ]})
@@ -172,7 +172,7 @@ async function api(req,env){
   }
   let edited,summary='';
   try{const body=await response.json(),out=JSON.parse(body?.choices?.[0]?.message?.content);edited=out.edited;summary=typeof out.summary==='string'?out.summary.slice(0,500):'';}catch(e){failure(502,'AI ส่งผลลัพธ์ไม่สมบูรณ์ ต้นฉบับไม่ได้เปลี่ยน');}
-  if(typeof edited!=='string'||!edited.trim()||edited.length>12000)failure(422,'ผลแก้ไขผิดปกติ ระบบจึงไม่ใช้ผลลัพธ์');
+  if(typeof edited!=='string'||!edited.trim()||edited.length>80000)failure(422,'ผลแก้ไขผิดปกติ ระบบจึงไม่ใช้ผลลัพธ์');
   return reply({edited,summary});
  }
  // Admin AI Assistant, level 2: read-only analysis and typed action proposals.
