@@ -10,6 +10,8 @@ export async function verifyAndConsumeConsent(db,{request,body,approved,userId,s
  if(!submitted.ok)return submitted;
  if(!approved?.ok||!Number.isSafeInteger(userId)||userId<1||
     !Number.isSafeInteger(now))return {ok:false,error:'invalid_context'};
+ const fields=['client_id','redirect_uri','code_challenge','scope','state'];
+ if(submitted.params.response_type!=='code'||submitted.params.code_challenge_method!=='S256'||fields.some(k=>submitted.params[k]!==approved[k]))return {ok:false,error:'mismatched_request'};
  const nonceHash=await hashConsentNonce(submitted.nonce);
  const contextHash=await hashConsentContext(approved,userId,sessionTokenHash);
  const consumed=await consumeBoundConsent(db,{nonceHash,contextHash,userId,now});
