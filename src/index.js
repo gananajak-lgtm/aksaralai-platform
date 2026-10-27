@@ -6,6 +6,7 @@ import {renderOAuthConsent} from './oauth-consent-view.js';
 import {renderBoundConsentForm} from './oauth-consent-form.js';
 import {generateConsentNonce,hashConsentNonce} from './oauth-consent-nonce.js';
 import {hashConsentContext,storeBoundConsent} from './oauth-consent-binding.js';
+import {handleOAuthConsentDenial} from './oauth-consent-route.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -69,6 +70,13 @@ async function api(req,env){
    html=renderBoundConsentForm(approved,nonce);
   }
   return new Response(html,{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action "+(formEnabled?"'self'":"'none'"),'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-frame-options':'DENY'}});
+ }
+ if(p==='/api/oauth/consent'&&m==='POST'){
+  if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true'||env.AKSARALAI_OAUTH_CONSENT_FORM_ENABLED!=='true')failure(503,'OAuth consent is disabled');
+  const writer=await author(db,req);
+  const sessionToken=cookie(req);
+  if(!sessionToken)failure(401,'Missing writer session');
+  return handleOAuthConsentDenial(db,req,{writerId:writer.id,sessionTokenHash:await sha(sessionToken),now:clock()});
  }
  if(p==='/api/register'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',3,24),name=str(d,'display_name',1,50),password=str(d,'password',8,128);
