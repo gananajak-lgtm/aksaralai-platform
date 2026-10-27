@@ -181,3 +181,8 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 3fdca6e: tests for cross-origin, duplicate fields and oversized payload rejection.
 - Approval intentionally returns 503 BEFORE nonce consumption. Authorization code issuance and token exchange are not implemented. Feature gates must remain disabled until these paths and end-to-end tests are complete.
 - CI, D1 migration status and deployment are unverified.
+
+## OAuth consent POST integration regression (2026-10-27)
+- e306016 adds test/oauth-consent-post-flow.test.js exercising the registered-client denial path, 303 access_denied callback preserving state, one-time nonce replay rejection, and approval fail-closed (503 before nonce consumption).
+- The live POST implementation was already committed concurrently in ef46a2b and 04c9c6b. This change adds coverage without overwriting the concurrent implementation.
+- Still required: authorization-code issuance, PKCE token exchange, migrations and end-to-end security tests. Keep OAuth consent and MCP gates disabled. Tests/CI/deployment not yet verified.
