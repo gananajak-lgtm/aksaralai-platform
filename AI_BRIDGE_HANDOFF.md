@@ -174,3 +174,10 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - 9a837f8 updates editor validation and clarifies that AI paragraph formatting remains limited to 4,500 characters.
 - ffc244d adds static regression tests for UI/API rewrite limits and separate formatter cap.
 - Important: A single gpt-4o-mini completion may not return a complete 40,000-character rewrite. End-to-end large-document testing and likely chunked rewrite processing are required before promising complete output. CI/deployment not verified.
+
+## OAuth consent POST denial route (2026-10-27)
+- ef46a2b: src/oauth-consent-route.js implements a denial-only POST flow with strict Origin, content-type, payload size, duplicate field rejection, registered-client validation, session/request-bound one-time nonce verification, and 303 access_denied redirect with state.
+- 04c9c6b: Worker wires POST /api/oauth/consent under both AKSARALAI_OAUTH_PREVIEW_ENABLED and AKSARALAI_OAUTH_CONSENT_FORM_ENABLED, with authenticated writer and session hash.
+- 3fdca6e: tests for cross-origin, duplicate fields and oversized payload rejection.
+- Approval intentionally returns 503 BEFORE nonce consumption. Authorization code issuance and token exchange are not implemented. Feature gates must remain disabled until these paths and end-to-end tests are complete.
+- CI, D1 migration status and deployment are unverified.
