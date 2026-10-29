@@ -198,3 +198,8 @@ The owner requests both chapter reading and editing. Keep existing read-only OAu
 
 ## Implementation checkpoint 2026-10-30
 Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval after nonce verification and hashed code issuance, then PKCE token endpoint; separate novels:write consent and owner-checked chapter revisions only after read flow passes tests. Do not enable feature flags until end-to-end verification.
+
+## OAuth consent approval implementation (2026-10-30)
+- f052cfd updates src/oauth-consent-route.js to support explicit approval after origin, form, registered client, nonce, user and session-context verification. A fresh random 32-byte code is persisted only by SHA-256 hash and returned via registered redirect with state.
+- Approval remains disabled by default: handleOAuthConsentDenial receives allowIssuance=false and the index.js caller does not enable it. Do not turn on until PKCE token exchange, integration tests, and deployment validation are ready.
+- Remaining: token exchange endpoint, write-scope design, ownership-checked chapter edit preview/confirm/revision history, CI and deploy verification.
