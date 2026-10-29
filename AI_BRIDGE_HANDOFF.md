@@ -192,3 +192,6 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - c189479 adds tests for hash-only persistence, expiry, invalid scope and failure-closed storage.
 - This primitive is NOT wired to the consent POST yet. The existing denial-only route remains unchanged. Integration must consume the request/session-bound nonce before issuance and handle failures safely; do not return an unpersisted grant. A cryptographically secure 32-byte random base64url generator must be passed by the caller.
 - Token exchange, full end-to-end tests, CI and deploy remain unverified. Keep OAuth/MCP gates disabled.
+
+## Requested next capability: chapter editing via ChatGPT
+The owner requests both chapter reading and editing. Keep existing read-only OAuth and MCP gates disabled until the authorization flow is complete. Design separate explicit write consent, chapter ownership verification, an edit preview, revision conflict protection, confirmation before saving, and rollback history. No write endpoint is enabled by this note.
