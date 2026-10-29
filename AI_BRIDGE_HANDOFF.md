@@ -195,3 +195,6 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 
 ## Requested next capability: chapter editing via ChatGPT
 The owner requests both chapter reading and editing. Keep existing read-only OAuth and MCP gates disabled until the authorization flow is complete. Design separate explicit write consent, chapter ownership verification, an edit preview, revision conflict protection, confirmation before saving, and rollback history. No write endpoint is enabled by this note.
+
+## Implementation checkpoint 2026-10-30
+Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval after nonce verification and hashed code issuance, then PKCE token endpoint; separate novels:write consent and owner-checked chapter revisions only after read flow passes tests. Do not enable feature flags until end-to-end verification.
