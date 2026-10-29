@@ -203,3 +203,9 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - f052cfd updates src/oauth-consent-route.js to support explicit approval after origin, form, registered client, nonce, user and session-context verification. A fresh random 32-byte code is persisted only by SHA-256 hash and returned via registered redirect with state.
 - Approval remains disabled by default: handleOAuthConsentDenial receives allowIssuance=false and the index.js caller does not enable it. Do not turn on until PKCE token exchange, integration tests, and deployment validation are ready.
 - Remaining: token exchange endpoint, write-scope design, ownership-checked chapter edit preview/confirm/revision history, CI and deploy verification.
+
+## OAuth checkpoint (2026-10-30)
+- 8c5180c: Added src/oauth-token-issuance.js to redeem a validated read-only authorization grant, persist a hashed random bearer token, and return a one-hour novels:read token.
+- 5c26d00: Reject timestamps whose one-hour expiration is not a safe integer.
+- The public token route has NOT been created: GitHub rejected the attempted file creation. No OAuth token endpoint is wired in src/index.js; consent approval is still disabled by default.
+- Next: implement and test token endpoint request parsing, client redirect allowlist, PKCE and replay protections; only then enable feature gates. CI and deploy not verified.
