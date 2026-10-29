@@ -186,3 +186,9 @@ Never enable anonymous manuscript reads, reuse a user's browser session as an ex
 - e306016 adds test/oauth-consent-post-flow.test.js exercising the registered-client denial path, 303 access_denied callback preserving state, one-time nonce replay rejection, and approval fail-closed (503 before nonce consumption).
 - The live POST implementation was already committed concurrently in ef46a2b and 04c9c6b. This change adds coverage without overwriting the concurrent implementation.
 - Still required: authorization-code issuance, PKCE token exchange, migrations and end-to-end security tests. Keep OAuth consent and MCP gates disabled. Tests/CI/deployment not yet verified.
+
+## OAuth authorization code issuance primitive (2026-10-29)
+- 40fe6ba adds src/oauth-code-issuance.js: a five-minute authorization code persisted only by SHA-256 hash, scoped to novels:read and bound to registered client, writer, redirect URI and PKCE challenge. It returns the raw code only after successful DB insert.
+- c189479 adds tests for hash-only persistence, expiry, invalid scope and failure-closed storage.
+- This primitive is NOT wired to the consent POST yet. The existing denial-only route remains unchanged. Integration must consume the request/session-bound nonce before issuance and handle failures safely; do not return an unpersisted grant. A cryptographically secure 32-byte random base64url generator must be passed by the caller.
+- Token exchange, full end-to-end tests, CI and deploy remain unverified. Keep OAuth/MCP gates disabled.
