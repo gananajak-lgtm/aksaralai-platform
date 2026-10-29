@@ -7,7 +7,7 @@ import {generateConsentNonce} from './oauth-consent-nonce.js';
 export async function redeemReadOnlyGrant(db,grant,now){
  if(!grant||typeof grant.codeHash!=='string'||typeof grant.clientId!=='string'||
     typeof grant.redirectUri!=='string'||!validatePkceVerifier(grant.verifier)||
-    !Number.isSafeInteger(now))return null;
+    !Number.isSafeInteger(now)||!Number.isSafeInteger(now+3600))return null;
  const redeemed=await redeemAuthorizationCode(db,{...grant,now});
  if(!redeemed||redeemed.scope!=='novels:read')return null;
  const token=generateConsentNonce();
