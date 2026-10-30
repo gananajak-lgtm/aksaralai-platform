@@ -13,7 +13,7 @@ function database(hash,{writerId=7,grantUserId=7,role='writer',novelOwner=7,expi
  return {prepare(sql){return {bind(...args){return {async first(){
   if(sql.includes('FROM oauth_access_tokens'))return args[0]===hash&&!expired&&!revoked?{user_id:grantUserId,client_id:'registered',scope:'novels:read'}:null;
   if(sql.includes('FROM users WHERE id=?'))return grantUserId===writerId&&role==='writer'?{id:writerId,role}:null;
-  if(sql.includes('FROM novels WHERE id=?'))return {id:12,author_id:novelOwner};
+  if(sql.includes('FROM novels WHERE id=? AND author_id=?'))return args[0]===12&&args[1]===novelOwner?{id:12,author_id:novelOwner}:null;
   throw Error('Unexpected query: '+sql);
  },async all(){
   if(sql.includes('FROM novels WHERE author_id=?'))return {results:args[0]===novelOwner?[{id:12,title:'Owned novel',summary:'',updated_at:1}]:[]};
@@ -43,4 +43,17 @@ test('expired, revoked, or non-writer grants fail closed',async()=>{
   const response=await worker.fetch(rpc('tools/list'),{DB:database(hash,settings),...flags});
   assert.equal(response.status,401);
  }
+});
+
+test('MCP cannot read another writer\'s novel',async()=>{
+ const db=database(await hashOAuthSecret(token),{novelOwner:9});
+ const response=await worker.fetch(rpc('tools/call',{name:'read_chapters',arguments:{novel_id:12,start:1,count:1}}),{DB:db,...flags});
+ assert.equal(response.status,404);
+});
+test('MCP read_chapters returns owned manuscript only',async()=>{
+ const db=database(await hashOAuthSecret(token));
+ const response=await worker.fetch(rpc('tools/call',{name:'read_chapters',arguments:{novel_id:12,start:1,count:1}}),{DB:db,...flags});
+ assert.equal(response.status,200);
+ const body=await response.json();
+ assert.match(body.result.content[0].text,/Test manuscript/);
 });
