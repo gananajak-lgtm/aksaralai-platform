@@ -237,3 +237,7 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - b8e25ed gates both OAuth authorization-server metadata and MCP protected-resource metadata on **all five** flags: AKSARALAI_OAUTH_PREVIEW_ENABLED, AKSARALAI_OAUTH_CONSENT_FORM_ENABLED, AKSARALAI_OAUTH_ISSUANCE_ENABLED, AKSARALAI_OAUTH_TOKEN_ENABLED, AKSARALAI_MCP_ENABLED. Metadata now responds 503 when the read-only integration is not fully enabled.
 - ca071e8 adds worker-level tests checking all four metadata paths, every missing flag, and fully enabled responses.
 - No CI green, live migration, OAuth client registration, or real ChatGPT connector verification established; do not enable flags in production yet.
+
+## MCP bearer integration regression tests (2026-10-30)
+- e3c406a and 552a83a add test/mcp-bearer-integration.test.js using mocked D1 to exercise the Worker MCP endpoint: no cookie-only access, valid bearer list_novels and read_chapters, expired/revoked/non-writer denial, and cross-writer ownership denial.
+- Tests have been committed but **not executed/verified** here. GitHub Actions status and live D1/ChatGPT OAuth-to-MCP integration remain outstanding. All feature flags remain disabled by default.
