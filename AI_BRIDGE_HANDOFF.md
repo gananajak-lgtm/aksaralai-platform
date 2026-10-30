@@ -215,3 +215,10 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - 9217eb0 wires POST /api/oauth/token behind AKSARALAI_OAUTH_TOKEN_ENABLED=true and consent approval behind independent AKSARALAI_OAUTH_ISSUANCE_ENABLED=true. Existing preview and consent-form gates remain. Cross-origin token/MCP requests are exempt from global same-origin blocking; both require their own bearer/PKCE authorization.
 - d8929c adds test/oauth-token-route.test.js for exchange, replay and malformed grants. CI status NOT confirmed.
 - IMPORTANT: Production integration is NOT complete: no OAuth discovery/registration metadata, no ChatGPT remote connector end-to-end verification, no live D1 migration/deploy verification, and no complete security review. Do not turn on feature gates until these pass. Test token endpoint and MCP with a registered client and an actual writer session. MCP remains strictly read-only.
+
+## OAuth discovery checkpoint (2026-10-30)
+- 20bbea5: src/oauth-metadata.js publishes OAuth authorization-server and MCP protected-resource metadata. PKCE S256 and novels:read only; no dynamic client registration. Registered client redirect URIs must be configured manually in oauth_clients.
+- f32091a: routes /.well-known/oauth-authorization-server, /.well-known/oauth-authorization-server/api/mcp, /.well-known/oauth-protected-resource, /.well-known/oauth-protected-resource/api/mcp.
+- 2813504: MCP 401 now returns WWW-Authenticate Bearer with resource_metadata URL.
+- 8727281: discovery metadata tests.
+- Not production ready: verify all tests in actual Node/CI, run remote D1 migrations, register approved ChatGPT OAuth client_id/redirect URIs, confirm compatibility with ChatGPT connector, perform live OAuth/MCP end-to-end security test and deploy. Never claim those steps complete without evidence. All OAuth/MCP feature flags stay off until verified.
