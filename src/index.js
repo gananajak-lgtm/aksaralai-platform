@@ -52,8 +52,14 @@ async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
  if(!db)failure(503,'ยังไม่เชื่อมต่อฐานข้อมูล D1');
  // Preview-only OAuth authorization screen. No consent or token issuance yet.
- if(m==='GET'&&(p==='/.well-known/oauth-authorization-server'||p==='/.well-known/oauth-authorization-server/api/mcp'))return oauthMetadata(req);
- if(m==='GET'&&(p==='/.well-known/oauth-protected-resource'||p==='/.well-known/oauth-protected-resource/api/mcp'))return protectedResourceMetadata(req);
+ if(m==='GET'&&(p==='/.well-known/oauth-authorization-server'||p==='/.well-known/oauth-authorization-server/api/mcp')){
+  if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true'||env.AKSARALAI_OAUTH_CONSENT_FORM_ENABLED!=='true'||env.AKSARALAI_OAUTH_ISSUANCE_ENABLED!=='true'||env.AKSARALAI_OAUTH_TOKEN_ENABLED!=='true'||env.AKSARALAI_MCP_ENABLED!=='true')failure(503,'OAuth discovery is disabled');
+  return oauthMetadata(req);
+ }
+ if(m==='GET'&&(p==='/.well-known/oauth-protected-resource'||p==='/.well-known/oauth-protected-resource/api/mcp')){
+  if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true'||env.AKSARALAI_OAUTH_CONSENT_FORM_ENABLED!=='true'||env.AKSARALAI_OAUTH_ISSUANCE_ENABLED!=='true'||env.AKSARALAI_OAUTH_TOKEN_ENABLED!=='true'||env.AKSARALAI_MCP_ENABLED!=='true')failure(503,'MCP discovery is disabled');
+  return protectedResourceMetadata(req);
+ }
  if(p==='/api/oauth/authorize'&&m==='GET'){
   if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true')failure(503,'OAuth consent preview is not enabled');
   const writer=await author(db,req);
@@ -854,7 +860,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url),m=req.method;
  if(url.pathname==='/health')return reply({status:'ok'});
  if(m==='GET'&&url.pathname.startsWith('/.well-known/oauth-')){
-  try{return await api(req,env);}catch(e){return reply({detail:'Metadata unavailable'},500);}
+  try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;return reply({detail:status===503?'Discovery is disabled':'Metadata unavailable'},status); }
  }
  if(url.pathname.startsWith('/api/')){
   if(!['GET','POST','PUT','DELETE'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT, DELETE'});
