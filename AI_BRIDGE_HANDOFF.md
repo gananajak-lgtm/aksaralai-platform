@@ -246,3 +246,9 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - 3e3aae0 limits authenticated MCP JSON-RPC requests to 65,536 bytes, checking both content-length and actual UTF-8 bytes, and rejects malformed/non-object JSON before dispatch. This avoids the generic 1.5 MB manuscript upload limit for control messages.
 - 040d64d adds regression cases for oversized and malformed authenticated MCP requests.
 - Changes committed but tests, CI, remote migrations and live ChatGPT connector deployment are not verified. Keep production OAuth/MCP flags off.
+
+## 2026-10-30 token helper checkpoint
+- Commit 8c5180c added src/oauth-token-issuance.js: hashed, one-hour, novels:read access-token issuance after code redemption.
+- Commit b01fb74 limits redemption arguments and checks expiry arithmetic.
+- The HTTP token route is not yet connected. Consent approval remains disabled by default. No CI or deployment validation has been completed for these commits.
+- Next work: route-level registered-client and redirect validation, request validation, token redemption tests, and only then gated integration. Chapter write access remains future work.
