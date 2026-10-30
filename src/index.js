@@ -8,6 +8,7 @@ import {generateConsentNonce,hashConsentNonce} from './oauth-consent-nonce.js';
 import {hashConsentContext,storeBoundConsent} from './oauth-consent-binding.js';
 import {handleOAuthConsentDenial} from './oauth-consent-route.js';
 import {handleOAuthToken} from './oauth-token-route.js';
+import {oauthMetadata,protectedResourceMetadata} from './oauth-metadata.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -51,6 +52,8 @@ async function api(req,env){
  const db=env.DB,u=new URL(req.url),p=u.pathname,m=req.method;let x;
  if(!db)failure(503,'ยังไม่เชื่อมต่อฐานข้อมูล D1');
  // Preview-only OAuth authorization screen. No consent or token issuance yet.
+ if(m==='GET'&&(p==='/.well-known/oauth-authorization-server'||p==='/.well-known/oauth-authorization-server/api/mcp'))return oauthMetadata(req);
+ if(m==='GET'&&(p==='/.well-known/oauth-protected-resource'||p==='/.well-known/oauth-protected-resource/api/mcp'))return protectedResourceMetadata(req);
  if(p==='/api/oauth/authorize'&&m==='GET'){
   if(env.AKSARALAI_OAUTH_PREVIEW_ENABLED!=='true')failure(503,'OAuth consent preview is not enabled');
   const writer=await author(db,req);
@@ -850,6 +853,9 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
 export default {async fetch(req,env){
  const url=new URL(req.url),m=req.method;
  if(url.pathname==='/health')return reply({status:'ok'});
+ if(m==='GET'&&url.pathname.startsWith('/.well-known/oauth-')){
+  try{return await api(req,env);}catch(e){return reply({detail:'Metadata unavailable'},500);}
+ }
  if(url.pathname.startsWith('/api/')){
   if(!['GET','POST','PUT','DELETE'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT, DELETE'});
   if(m!=='GET'){
