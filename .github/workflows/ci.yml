@@ -14,9 +14,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate JavaScript syntax
+      - name: Validate all JavaScript modules and browser scripts
         run: |
-          node --check src/index.js
+          find src test -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node sw-check.mjs
-      - name: Run API tests
+      - name: Run API and OAuth tests
         run: npm test
+      - name: Install Worker bundler
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Validate Cloudflare Worker bundle without deploying
+        run: npx wrangler deploy --dry-run --outdir /tmp/aksaralai-worker-check
