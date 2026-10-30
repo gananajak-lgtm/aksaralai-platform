@@ -1,7 +1,6 @@
 import {hashOAuthSecret} from './oauth-bearer.js';
-import {redeemAuthorizationCode} from './oauth-storage.js';
+import {redeemReadOnlyGrant} from './oauth-token-issuance.js';
 import {validateRedirectUri,validatePkceVerifier} from './oauth-pkce.js';
-import {generateConsentNonce} from './oauth-consent-nonce.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','pragma':'no-cache','x-content-type-options':'nosniff'}});
 const error=(code,status=400)=>json({error:code},status);
@@ -24,11 +23,7 @@ export async function handleOAuthToken(db,request,{now}){
  if(!client)return error('invalid_client',401);
  let allowlist;try{allowlist=JSON.parse(client.redirect_uris_json)}catch{return error('invalid_client',401)}
  if(!validateRedirectUri(form.redirect_uri,allowlist))return error('invalid_grant');
- const grant=await redeemAuthorizationCode(db,{codeHash:await hashOAuthSecret(form.code),clientId:form.client_id,redirectUri:form.redirect_uri,verifier:form.code_verifier,now});
- if(!grant||grant.scope!=='novels:read')return error('invalid_grant');
- const token=generateConsentNonce();
- const result=await db.prepare('INSERT INTO oauth_access_tokens(token_hash,client_id,user_id,scope,expires_at,created_at) VALUES(?,?,?,?,?,?)')
-  .bind(await hashOAuthSecret(token),grant.client_id,grant.user_id,'novels:read',now+3600,now).run();
- if(result.meta?.changes!==1)return error('server_error',500);
- return json({access_token:token,token_type:'Bearer',expires_in:3600,scope:'novels:read'});
+ const token=await redeemReadOnlyGrant(db,{codeHash:await hashOAuthSecret(form.code),clientId:form.client_id,redirectUri:form.redirect_uri,verifier:form.code_verifier},now);
+ if(!token)return error('invalid_grant');
+ return json(token);
 }
