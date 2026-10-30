@@ -222,3 +222,8 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - 2813504: MCP 401 now returns WWW-Authenticate Bearer with resource_metadata URL.
 - 8727281: discovery metadata tests.
 - Not production ready: verify all tests in actual Node/CI, run remote D1 migrations, register approved ChatGPT OAuth client_id/redirect URIs, confirm compatibility with ChatGPT connector, perform live OAuth/MCP end-to-end security test and deploy. Never claim those steps complete without evidence. All OAuth/MCP feature flags stay off until verified.
+
+## Token exchange consolidation (2026-10-30)
+- b3ffb8b refactors src/oauth-token-route.js to reuse existing redeemReadOnlyGrant from src/oauth-token-issuance.js instead of duplicating redemption/token storage. The helper rejects unsafe expiry arithmetic before consuming an authorization code.
+- 74e1fc8 adds regression coverage for unsafe expiration timestamps; checks no grant consumed and no token stored.
+- Must still run npm test and validate GitHub Actions; remote D1 migrations, OAuth client registration, live ChatGPT connector test and deploy are NOT verified. Keep all OAuth and MCP feature gates disabled.
