@@ -232,3 +232,8 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - 44f5a7f updates GitHub Actions to syntax-check every src/test JS file, run npm test, install Wrangler and dry-run bundle. Workflow execution status was not yet returned by GitHub.
 - 0a31733 adds OAUTH_MCP_RELEASE_CHECKLIST.md with staging-only migration, manual OAuth client registration, exact callback, negative tests, feature flags and rollout/rollback steps.
 - No Cloudflare deploy, remote D1 migration, or live ChatGPT connector test was performed. Do not claim production readiness.
+
+## Discovery fail-closed hardening (2026-10-30)
+- b8e25ed gates both OAuth authorization-server metadata and MCP protected-resource metadata on **all five** flags: AKSARALAI_OAUTH_PREVIEW_ENABLED, AKSARALAI_OAUTH_CONSENT_FORM_ENABLED, AKSARALAI_OAUTH_ISSUANCE_ENABLED, AKSARALAI_OAUTH_TOKEN_ENABLED, AKSARALAI_MCP_ENABLED. Metadata now responds 503 when the read-only integration is not fully enabled.
+- ca071e8 adds worker-level tests checking all four metadata paths, every missing flag, and fully enabled responses.
+- No CI green, live migration, OAuth client registration, or real ChatGPT connector verification established; do not enable flags in production yet.
