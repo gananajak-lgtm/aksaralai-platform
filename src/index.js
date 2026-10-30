@@ -641,7 +641,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   // Keeping this endpoint disabled prevents cross-origin clients from using ambient sessions.
   if(env.AKSARALAI_MCP_ENABLED!=='true')failure(503,'MCP connector is not enabled');
   const actor=await resolveMcpWriter(db,req,clock(),authenticateOAuthBearer);
-  if(!actor)failure(401,'MCP requires OAuth authorization');
+  if(!actor)return reply({detail:'MCP requires OAuth authorization'},401,{'www-authenticate':'Bearer resource_metadata="'+u.origin+'/.well-known/oauth-protected-resource/api/mcp"'});
   const accept=req.headers.get('accept')||'';
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
   const d=await payload(req);
