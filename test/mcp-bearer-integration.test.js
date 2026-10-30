@@ -57,3 +57,22 @@ test('MCP read_chapters returns owned manuscript only',async()=>{
  const body=await response.json();
  assert.match(body.result.content[0].text,/Test manuscript/);
 });
+
+test('MCP refuses oversized JSON-RPC control messages even with valid bearer',async()=>{
+ const db=database(await hashOAuthSecret(token));
+ const request=new Request('https://aksaralai.example/api/mcp',{
+  method:'POST',headers:{'content-type':'application/json','accept':'application/json','authorization':'Bearer '+token},
+  body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list',padding:'x'.repeat(65536)})
+ });
+ const response=await worker.fetch(request,{DB:db,...flags});
+ assert.equal(response.status,413);
+});
+test('MCP rejects malformed JSON after successful bearer authorization',async()=>{
+ const db=database(await hashOAuthSecret(token));
+ const request=new Request('https://aksaralai.example/api/mcp',{
+  method:'POST',headers:{'content-type':'application/json','accept':'application/json','authorization':'Bearer '+token},
+  body:'{broken'
+ });
+ const response=await worker.fetch(request,{DB:db,...flags});
+ assert.equal(response.status,400);
+});
