@@ -209,3 +209,9 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - 5c26d00: Reject timestamps whose one-hour expiration is not a safe integer.
 - The public token route has NOT been created: GitHub rejected the attempted file creation. No OAuth token endpoint is wired in src/index.js; consent approval is still disabled by default.
 - Next: implement and test token endpoint request parsing, client redirect allowlist, PKCE and replay protections; only then enable feature gates. CI and deploy not verified.
+
+## OAuth token exchange and consent integration (2026-10-30)
+- 963022b adds POST form handler src/oauth-token-route.js: registered client and exact redirect validation, PKCE S256 verification, one-time code redemption, 3600s read-only bearer token, SHA-256 hash-only storage, strict duplicate/oversize rejection.
+- 9217eb0 wires POST /api/oauth/token behind AKSARALAI_OAUTH_TOKEN_ENABLED=true and consent approval behind independent AKSARALAI_OAUTH_ISSUANCE_ENABLED=true. Existing preview and consent-form gates remain. Cross-origin token/MCP requests are exempt from global same-origin blocking; both require their own bearer/PKCE authorization.
+- d8929c adds test/oauth-token-route.test.js for exchange, replay and malformed grants. CI status NOT confirmed.
+- IMPORTANT: Production integration is NOT complete: no OAuth discovery/registration metadata, no ChatGPT remote connector end-to-end verification, no live D1 migration/deploy verification, and no complete security review. Do not turn on feature gates until these pass. Test token endpoint and MCP with a registered client and an actual writer session. MCP remains strictly read-only.
