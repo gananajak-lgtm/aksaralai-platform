@@ -8,7 +8,7 @@ export async function redeemReadOnlyGrant(db,grant,now){
  if(!grant||typeof grant.codeHash!=='string'||typeof grant.clientId!=='string'||
     typeof grant.redirectUri!=='string'||!validatePkceVerifier(grant.verifier)||
     !Number.isSafeInteger(now)||!Number.isSafeInteger(now+3600))return null;
- const redeemed=await redeemAuthorizationCode(db,{...grant,now});
+ const redeemed=await redeemAuthorizationCode(db,{codeHash:grant.codeHash,clientId:grant.clientId,redirectUri:grant.redirectUri,verifier:grant.verifier,now});
  if(!redeemed||redeemed.scope!=='novels:read')return null;
  const token=generateConsentNonce();
  const stored=await db.prepare('INSERT INTO oauth_access_tokens(token_hash,client_id,user_id,scope,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(await hashOAuthSecret(token),redeemed.client_id,redeemed.user_id,'novels:read',now+3600,now).run();
