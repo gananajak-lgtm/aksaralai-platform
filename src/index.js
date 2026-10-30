@@ -650,7 +650,13 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!actor)return reply({detail:'MCP requires OAuth authorization'},401,{'www-authenticate':'Bearer resource_metadata="'+u.origin+'/.well-known/oauth-protected-resource/api/mcp"'});
   const accept=req.headers.get('accept')||'';
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
-  const d=await payload(req);
+  // MCP calls are control messages, not manuscript uploads. Bound request size.
+  if(Number(req.headers.get('content-length')||0)>65536)failure(413,'MCP request too large');
+  const raw=await req.text();
+  if(enc.encode(raw).length>65536)failure(413,'MCP request too large');
+  if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'MCP requires JSON');
+  let d;try{d=JSON.parse(raw);}catch{failure(400,'Invalid MCP JSON');}
+  if(!d||typeof d!=='object'||Array.isArray(d))failure(400,'Invalid MCP message');
   const id=d.id;
   const isNotification=d.method==='notifications/initialized';
   if(isNotification&&id!==undefined)failure(400,'MCP notifications must not include an id');
