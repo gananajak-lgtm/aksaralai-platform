@@ -227,3 +227,8 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - b3ffb8b refactors src/oauth-token-route.js to reuse existing redeemReadOnlyGrant from src/oauth-token-issuance.js instead of duplicating redemption/token storage. The helper rejects unsafe expiry arithmetic before consuming an authorization code.
 - 74e1fc8 adds regression coverage for unsafe expiration timestamps; checks no grant consumed and no token stored.
 - Must still run npm test and validate GitHub Actions; remote D1 migrations, OAuth client registration, live ChatGPT connector test and deploy are NOT verified. Keep all OAuth and MCP feature gates disabled.
+
+## CI and staging release gates (2026-10-30)
+- 44f5a7f updates GitHub Actions to syntax-check every src/test JS file, run npm test, install Wrangler and dry-run bundle. Workflow execution status was not yet returned by GitHub.
+- 0a31733 adds OAUTH_MCP_RELEASE_CHECKLIST.md with staging-only migration, manual OAuth client registration, exact callback, negative tests, feature flags and rollout/rollback steps.
+- No Cloudflare deploy, remote D1 migration, or live ChatGPT connector test was performed. Do not claim production readiness.
