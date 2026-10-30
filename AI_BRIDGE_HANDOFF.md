@@ -241,3 +241,8 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 ## MCP bearer integration regression tests (2026-10-30)
 - e3c406a and 552a83a add test/mcp-bearer-integration.test.js using mocked D1 to exercise the Worker MCP endpoint: no cookie-only access, valid bearer list_novels and read_chapters, expired/revoked/non-writer denial, and cross-writer ownership denial.
 - Tests have been committed but **not executed/verified** here. GitHub Actions status and live D1/ChatGPT OAuth-to-MCP integration remain outstanding. All feature flags remain disabled by default.
+
+## MCP request hardening (2026-10-30)
+- 3e3aae0 limits authenticated MCP JSON-RPC requests to 65,536 bytes, checking both content-length and actual UTF-8 bytes, and rejects malformed/non-object JSON before dispatch. This avoids the generic 1.5 MB manuscript upload limit for control messages.
+- 040d64d adds regression cases for oversized and malformed authenticated MCP requests.
+- Changes committed but tests, CI, remote migrations and live ChatGPT connector deployment are not verified. Keep production OAuth/MCP flags off.
