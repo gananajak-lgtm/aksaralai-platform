@@ -41,3 +41,11 @@ test('invalid verifier, redirect, duplicate form keys, and unknown client fail c
  const dup=new Request('https://aksaralai.example/api/oauth/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams([...Object.entries(valid),['code','d'.repeat(43)]])});
  assert.equal((await handleOAuthToken(db,dup,{now:1000})).status,400);
 });
+
+test('token issuance rejects timestamps that would overflow safe integer expiry',async()=>{
+ const db=fakeDb(await challenge());
+ const res=await handleOAuthToken(db,request(valid),{now:Number.MAX_SAFE_INTEGER-100});
+ assert.equal(res.status,400);
+ assert.equal(db.state.used,false);
+ assert.equal(db.state.token,null);
+});
