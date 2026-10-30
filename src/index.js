@@ -7,6 +7,7 @@ import {renderBoundConsentForm} from './oauth-consent-form.js';
 import {generateConsentNonce,hashConsentNonce} from './oauth-consent-nonce.js';
 import {hashConsentContext,storeBoundConsent} from './oauth-consent-binding.js';
 import {handleOAuthConsentDenial} from './oauth-consent-route.js';
+import {handleOAuthToken} from './oauth-token-route.js';
 // Aksaralai — Cloudflare Worker + D1.
 const enc = new TextEncoder();
 const clock = () => Math.floor(Date.now()/1000);
@@ -76,7 +77,11 @@ async function api(req,env){
   const writer=await author(db,req);
   const sessionToken=cookie(req);
   if(!sessionToken)failure(401,'Missing writer session');
-  return handleOAuthConsentDenial(db,req,{writerId:writer.id,sessionTokenHash:await sha(sessionToken),now:clock()});
+  return handleOAuthConsentDenial(db,req,{writerId:writer.id,sessionTokenHash:await sha(sessionToken),now:clock(),allowIssuance:env.AKSARALAI_OAUTH_ISSUANCE_ENABLED==='true'});
+ }
+ if(p==='/api/oauth/token'&&m==='POST'){
+  if(env.AKSARALAI_OAUTH_TOKEN_ENABLED!=='true')failure(503,'OAuth token exchange is disabled');
+  return handleOAuthToken(db,req,{now:clock()});
  }
  if(p==='/api/register'&&m==='POST'){
   const d=await payload(req),username=str(d,'username',3,24),name=str(d,'display_name',1,50),password=str(d,'password',8,128);
@@ -849,8 +854,8 @@ export default {async fetch(req,env){
   if(!['GET','POST','PUT','DELETE'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT, DELETE'});
   if(m!=='GET'){
    const origin=req.headers.get('origin');
-   if(origin!==null&&origin!==url.origin)return reply({detail:'Forbidden origin'},403);
-   if(req.headers.get('sec-fetch-site')==='cross-site')return reply({detail:'Forbidden site'},403);
+   if(origin!==null&&origin!==url.origin&&url.pathname!=='/api/oauth/token'&&url.pathname!=='/api/mcp')return reply({detail:'Forbidden origin'},403);
+   if(req.headers.get('sec-fetch-site')==='cross-site'&&url.pathname!=='/api/oauth/token'&&url.pathname!=='/api/mcp')return reply({detail:'Forbidden site'},403);
   }
   try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;if(status===500)console.error('API failure',String(e));return reply({detail:status===500?'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์':e.message,...(status===500?{code:['MANUSCRIPT_EXPORT_NOVEL_FAILED','MANUSCRIPT_EXPORT_READ_FAILED','MANUSCRIPT_EXPORT_BUILD_FAILED'].includes(e.code)?e.code:['AUTH_HASH','AUTH_INSERT','AUTH_SESSION','LOGIN_LOOKUP','LOGIN_VERIFY','LOGIN_SESSION'].includes(e.code)?e.code:'API_UNEXPECTED'}:{})},status);}
  }
