@@ -49,3 +49,16 @@ test('token issuance rejects timestamps that would overflow safe integer expiry'
  assert.equal(db.state.used,false);
  assert.equal(db.state.token,null);
 });
+
+test('token persistence failure does not expose an access token',async()=>{
+ const db=fakeDb(await challenge());
+ const original=db.prepare.bind(db);
+ db.prepare=(sql)=>{
+  const stmt=original(sql);
+  if(!sql.includes('INSERT INTO oauth_access_tokens'))return stmt;
+  return {bind(){return {async run(){return {meta:{changes:0}}}}}};
+ };
+ await assert.rejects(()=>handleOAuthToken(db,request(valid),{now:1000}),/Access token persistence failed/);
+ assert.equal(db.state.used,true);
+ assert.equal(db.state.token,null);
+});
