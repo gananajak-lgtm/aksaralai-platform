@@ -62,3 +62,23 @@ test('token persistence failure does not expose an access token',async()=>{
  assert.equal(db.state.used,true);
  assert.equal(db.state.token,null);
 });
+
+test('token route rejects malformed requests before consuming a code',async()=>{
+ const db=fakeDb(await challenge());
+ const malformed=[
+  new Request('https://aksaralai.example/api/oauth/token',{method:'GET'}),
+  new Request('https://aksaralai.example/api/oauth/token',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}),
+  request({...valid,grant_type:'refresh_token'}),
+  request({...valid,code:'short'}),
+  request({...valid,code_verifier:'short'}),
+  new Request('https://aksaralai.example/api/oauth/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams([...Object.entries(valid),['extra','unexpected']])}),
+  new Request('https://aksaralai.example/api/oauth/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'padding='+('a'.repeat(8200))})
+ ];
+ for(const req of malformed){
+  const response=await handleOAuthToken(db,req,{now:1000});
+  assert.ok(response.status>=400);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal(db.state.used,false);
+  assert.equal(db.state.token,null);
+ }
+});
