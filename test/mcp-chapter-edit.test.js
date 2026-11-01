@@ -44,3 +44,13 @@ test('rejects unauthorized writers and stale fingerprints',async()=>{
  assert.equal((await applyChapterEdit(store,{writerId:3,chapterId:7,newBody:'Updated',fingerprint:p.fingerprint,confirm:true})).error,'conflict');
  assert.equal(store.state.writes,0);
 });
+
+test('preview fingerprint cannot authorize a different proposed chapter body',async()=>{
+ const store=db();
+ const preview=await previewChapterEdit(store,{writerId:3,chapterId:7,newBody:'Approved revision'});
+ const result=await applyChapterEdit(store,{writerId:3,chapterId:7,newBody:'Unapproved revision',fingerprint:preview.fingerprint,confirm:true});
+ assert.equal(result.error,'conflict');
+ assert.equal(store.state.body,'Original manuscript');
+ assert.equal(store.state.history.length,0);
+ assert.equal(store.state.writes,0);
+});
