@@ -28,9 +28,18 @@ export async function applyChapterEdit(db,{writerId,chapterId,newBody,fingerprin
  // Compare-and-swap guards against concurrent edits; no unowned chapter can be changed.
  const chapter=await load(db,writerId,chapterId);
  if(!chapter||await digest(chapter.body)!==fingerprint)return {ok:false,error:'conflict'};
- const result=await db.prepare(
+ if(typeof db.batch!=='function')return {ok:false,error:'atomic_batch_required'};
+ const now=Math.floor(Date.now()/1000);
+ // The history insert is conditional on the same current body and writer ownership.
+ // Both statements commit together, so failed updates cannot leave orphan snapshots.
+ const update=db.prepare(
   'UPDATE chapters SET body=? WHERE id=? AND body=? AND EXISTS (SELECT 1 FROM novels WHERE id=chapters.novel_id AND author_id=?)'
- ).bind(newBody,chapterId,chapter.body,writerId).run();
- if(result.meta?.changes!==1)return {ok:false,error:'conflict'};
+ ).bind(newBody,chapterId,chapter.body,writerId);
+ const history=db.prepare(
+  'INSERT INTO chapter_edit_history(chapter_id,novel_id,writer_id,before_body,after_body,created_at) SELECT c.id,c.novel_id,?,c.body,?,? FROM chapters c JOIN novels n ON n.id=c.novel_id WHERE c.id=? AND n.author_id=? AND c.body=?'
+ ).bind(writerId,newBody,now,chapterId,writerId,chapter.body);
+ // Snapshot must be captured before the update in the atomic D1 batch.
+ const results=await db.batch([history,update]);
+ if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1)return {ok:false,error:'conflict'};
  return {ok:true,chapter_id:chapterId,novel_id:chapter.novel_id};
 }
