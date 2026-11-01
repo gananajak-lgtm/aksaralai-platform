@@ -13,7 +13,7 @@ export async function previewChapterEdit(db,{writerId,chapterId,newBody}){
   return {ok:false,error:'invalid_arguments'};
  const chapter=await load(db,writerId,chapterId);
  if(!chapter)return {ok:false,error:'not_found'};
- const fingerprint=await digest(chapter.body);
+ const fingerprint=await digest(JSON.stringify([chapter.id,chapter.body,newBody]));
  return {ok:true,chapter_id:chapter.id,novel_id:chapter.novel_id,title:chapter.title,
   original_length:chapter.body.length,new_length:newBody.length,changed:chapter.body!==newBody,
   fingerprint};
@@ -27,7 +27,7 @@ export async function applyChapterEdit(db,{writerId,chapterId,newBody,fingerprin
  if(!preview.changed)return {ok:false,error:'unchanged'};
  // Compare-and-swap guards against concurrent edits; no unowned chapter can be changed.
  const chapter=await load(db,writerId,chapterId);
- if(!chapter||await digest(chapter.body)!==fingerprint)return {ok:false,error:'conflict'};
+ if(!chapter||await digest(JSON.stringify([chapter.id,chapter.body,newBody]))!==fingerprint)return {ok:false,error:'conflict'};
  if(typeof db.batch!=='function')return {ok:false,error:'atomic_batch_required'};
  const now=Math.floor(Date.now()/1000);
  // The history insert is conditional on the same current body and writer ownership.
