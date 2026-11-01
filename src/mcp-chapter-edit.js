@@ -43,3 +43,18 @@ export async function applyChapterEdit(db,{writerId,chapterId,newBody,fingerprin
  if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1)return {ok:false,error:'conflict'};
  return {ok:true,chapter_id:chapterId,novel_id:chapter.novel_id};
 }
+
+export async function undoChapterEdit(db,{writerId,historyId,confirm}){
+ if(confirm!==true||!validId(writerId)||!validId(historyId))return {ok:false,error:'confirmation_required'};
+ const snapshot=await db.prepare(
+  'SELECT h.id,h.chapter_id,h.novel_id,h.before_body,h.after_body FROM chapter_edit_history h JOIN novels n ON n.id=h.novel_id WHERE h.id=? AND h.writer_id=? AND n.author_id=?'
+ ).bind(historyId,writerId,writerId).first();
+ if(!snapshot)return {ok:false,error:'not_found'};
+ const current=await load(db,writerId,snapshot.chapter_id);
+ if(!current||current.body!==snapshot.after_body)return {ok:false,error:'conflict'};
+ const result=await db.prepare(
+  'UPDATE chapters SET body=? WHERE id=? AND body=? AND EXISTS (SELECT 1 FROM novels WHERE id=chapters.novel_id AND author_id=?)'
+ ).bind(snapshot.before_body,snapshot.chapter_id,snapshot.after_body,writerId).run();
+ if(result.meta?.changes!==1)return {ok:false,error:'conflict'};
+ return {ok:true,chapter_id:snapshot.chapter_id,novel_id:snapshot.novel_id};
+}
