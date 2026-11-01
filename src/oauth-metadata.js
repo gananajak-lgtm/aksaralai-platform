@@ -9,6 +9,7 @@ export function oauthMetadata(request){
   issuer:origin,
   authorization_endpoint:origin+'/api/oauth/authorize',
   token_endpoint:origin+'/api/oauth/token',
+  client_id_metadata_document_supported:true,
   response_types_supported:['code'],
   grant_types_supported:['authorization_code'],
   code_challenge_methods_supported:['S256'],
@@ -32,3 +33,4 @@ export function protectedResourceMetadata(request){
   'x-content-type-options':'nosniff','access-control-allow-origin':'*'
  }});
 }
+
