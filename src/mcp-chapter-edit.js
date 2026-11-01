@@ -39,7 +39,8 @@ export async function applyChapterEdit(db,{writerId,chapterId,newBody,fingerprin
   'INSERT INTO chapter_edit_history(chapter_id,novel_id,writer_id,before_body,after_body,created_at) SELECT c.id,c.novel_id,?,c.body,?,? FROM chapters c JOIN novels n ON n.id=c.novel_id WHERE c.id=? AND n.author_id=? AND c.body=?'
  ).bind(writerId,newBody,now,chapterId,writerId,chapter.body);
  // Snapshot must be captured before the update in the atomic D1 batch.
- const results=await db.batch([history,update]);
+ const touch=db.prepare('UPDATE novels SET updated_at=? WHERE id=? AND author_id=? AND changes()=1').bind(now,chapter.novel_id,writerId);
+ const results=await db.batch([history,update,touch]);
  if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1)return {ok:false,error:'conflict'};
  return {ok:true,chapter_id:chapterId,novel_id:chapter.novel_id,history_id:results[0]?.meta?.last_row_id??null};
 }
@@ -58,9 +59,18 @@ export async function undoChapterEdit(db,{writerId,historyId,confirm}){
  if(!latest||latest.id!==historyId)return {ok:false,error:'conflict'};
  const current=await load(db,writerId,snapshot.chapter_id);
  if(!current||current.body!==snapshot.after_body)return {ok:false,error:'conflict'};
- const result=await db.prepare(
-  'UPDATE chapters SET body=? WHERE id=? AND body=? AND EXISTS (SELECT 1 FROM novels WHERE id=chapters.novel_id AND author_id=?)'
- ).bind(snapshot.before_body,snapshot.chapter_id,snapshot.after_body,writerId).run();
- if(result.meta?.changes!==1)return {ok:false,error:'conflict'};
- return {ok:true,chapter_id:snapshot.chapter_id,novel_id:snapshot.novel_id};
+ if(typeof db.batch!=='function')return {ok:false,error:'atomic_batch_required'};
+ const now=Math.floor(Date.now()/1000);
+ // Recheck both ownership and latest history inside the transaction. Record
+ // the reversal itself so it cannot be replayed after later content changes.
+ const history=db.prepare(
+  'INSERT INTO chapter_edit_history(chapter_id,novel_id,writer_id,before_body,after_body,created_at) SELECT c.id,c.novel_id,?,c.body,?,? FROM chapters c JOIN novels n ON n.id=c.novel_id WHERE c.id=? AND n.author_id=? AND c.body=? AND (SELECT MAX(id) FROM chapter_edit_history WHERE chapter_id=c.id)=?'
+ ).bind(writerId,snapshot.before_body,now,snapshot.chapter_id,writerId,snapshot.after_body,historyId);
+ const update=db.prepare(
+  'UPDATE chapters SET body=? WHERE id=? AND body=? AND EXISTS (SELECT 1 FROM novels WHERE id=chapters.novel_id AND author_id=?) AND changes()=1'
+ ).bind(snapshot.before_body,snapshot.chapter_id,snapshot.after_body,writerId);
+ const touch=db.prepare('UPDATE novels SET updated_at=? WHERE id=? AND author_id=? AND changes()=1').bind(now,snapshot.novel_id,writerId);
+ const results=await db.batch([history,update,touch]);
+ if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1)return {ok:false,error:'conflict'};
+ return {ok:true,chapter_id:snapshot.chapter_id,novel_id:snapshot.novel_id,history_id:results[0].meta.last_row_id};
 }
