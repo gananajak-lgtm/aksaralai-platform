@@ -82,3 +82,15 @@ test('token route rejects malformed requests before consuming a code',async()=>{
   assert.equal(db.state.token,null);
  }
 });
+
+test('invalid Content-Length is rejected without redeeming a code',async()=>{
+ const db=fakeDb(await challenge());
+ for(const declared of ['-1','not-a-number','1.5','8193']){
+  const req=request(valid);
+  req.headers.set('content-length',declared);
+  const res=await handleOAuthToken(db,req,{now:1000});
+  assert.ok(res.status>=400);
+  assert.equal(db.state.used,false);
+  assert.equal(db.state.token,null);
+ }
+});
