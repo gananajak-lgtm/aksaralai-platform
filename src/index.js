@@ -1,3 +1,4 @@
+import {previewChapterEdit,applyChapterEdit,undoChapterEdit} from './mcp-chapter-edit.js';
 import {makeDocx,makePlainText} from './manuscript-export.js';
 import {resolveMcpWriter} from './mcp-auth.js';
 import {authenticateOAuthBearer} from './oauth-bearer.js';
@@ -676,14 +677,27 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
    {name:'read_chapters',description:'Read 1 to 5 chapters, maximum 100000 characters',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},start:{type:'integer',minimum:1},count:{type:'integer',minimum:1,maximum:5}},required:['novel_id','start','count'],additionalProperties:false}},
    {name:'search_novel',description:'Find short excerpts containing a literal search term',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},query:{type:'string',minLength:2,maxLength:100}},required:['novel_id','query'],additionalProperties:false}}
   ];
+  if(env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED==='true'){
+   specs.push(
+    {name:'preview_chapter_edit',description:'Preview a proposed full-chapter revision without saving; returns a fingerprint for confirmation',inputSchema:{type:'object',properties:{chapter_id:{type:'integer',minimum:1},new_body:{type:'string',minLength:1,maxLength:300000}},required:['chapter_id','new_body'],additionalProperties:false}},
+    {name:'apply_chapter_edit',description:'Save a previously previewed revision only after explicit user confirmation',inputSchema:{type:'object',properties:{chapter_id:{type:'integer',minimum:1},new_body:{type:'string',minLength:1,maxLength:300000},fingerprint:{type:'string'},confirm:{type:'boolean'}},required:['chapter_id','new_body','fingerprint','confirm'],additionalProperties:false}},
+    {name:'undo_chapter_edit',description:'Restore a saved chapter edit when the manuscript still matches the recorded after-version; requires confirmation',inputSchema:{type:'object',properties:{history_id:{type:'integer',minimum:1},confirm:{type:'boolean'}},required:['history_id','confirm'],additionalProperties:false}}
+   );
+  }
   if(d.method==='ping')return result({});
   if(d.method==='tools/list')return result({tools:specs});
   if(d.method!=='tools/call')return err(-32601,'Method not found');
   const name=d.params?.name,args=d.params?.arguments;
   if(!specs.some(t=>t.name===name)||!args||typeof args!=='object'||Array.isArray(args))return err(-32602,'Invalid tool arguments');
-  const keys=Object.keys(args),allowed={list_novels:[],list_chapters:['novel_id'],read_chapters:['novel_id','start','count'],search_novel:['novel_id','query']}[name];
+  const keys=Object.keys(args),allowed={list_novels:[],list_chapters:['novel_id'],read_chapters:['novel_id','start','count'],search_novel:['novel_id','query'],preview_chapter_edit:['chapter_id','new_body'],apply_chapter_edit:['chapter_id','new_body','fingerprint','confirm'],undo_chapter_edit:['history_id','confirm']}[name];
   if(keys.some(k=>!allowed.includes(k)))return err(-32602,'Unknown tool argument');
   let data;
+  if(name==='preview_chapter_edit'||name==='apply_chapter_edit'||name==='undo_chapter_edit'){
+   if(env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED!=='true')return err(-32601,'Method not found');
+   const payload=name==='undo_chapter_edit'?{writerId:actor.id,historyId:args.history_id,confirm:args.confirm}:{writerId:actor.id,chapterId:args.chapter_id,newBody:args.new_body,fingerprint:args.fingerprint,confirm:args.confirm};
+   const response=name==='preview_chapter_edit'?await previewChapterEdit(db,payload):name==='apply_chapter_edit'?await applyChapterEdit(db,payload):await undoChapterEdit(db,payload);
+   return result({content:[{type:'text',text:JSON.stringify(response)}],isError:!response.ok});
+  }
   if(name==='list_novels')data={novels:await rows(db,'SELECT id,title,summary,updated_at FROM novels WHERE author_id=? ORDER BY updated_at DESC LIMIT 100',actor.id)};
   else{
    const nid=args.novel_id;
