@@ -54,3 +54,14 @@ test('preview fingerprint cannot authorize a different proposed chapter body',as
  assert.equal(store.state.history.length,0);
  assert.equal(store.state.writes,0);
 });
+
+test('supports long Thai chapter revisions and rejects empty manuscripts',async()=>{
+ const store=db();
+ const body='ก'.repeat(30000);
+ const preview=await previewChapterEdit(store,{writerId:3,chapterId:7,newBody:body});
+ assert.equal(preview.ok,true);
+ assert.equal(preview.new_length,30000);
+ assert.equal((await applyChapterEdit(store,{writerId:3,chapterId:7,newBody:body,fingerprint:preview.fingerprint,confirm:true})).ok,true);
+ assert.equal(store.state.body,body);
+ assert.equal((await previewChapterEdit(store,{writerId:3,chapterId:7,newBody:'   '})).error,'invalid_arguments');
+});
