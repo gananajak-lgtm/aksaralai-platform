@@ -34,3 +34,11 @@ head_sampling_rate = 1
 persist = true
 
 [observability]
+
+# Read-only MCP OAuth runtime configuration. Client registration remains manual.
+[vars]
+AKSARALAI_MCP_ENABLED = "true"
+AKSARALAI_OAUTH_CONSENT_FORM_ENABLED = "true"
+AKSARALAI_OAUTH_ISSUANCE_ENABLED = "true"
+AKSARALAI_OAUTH_PREVIEW_ENABLED = "true"
+AKSARALAI_OAUTH_TOKEN_ENABLED = "true"
