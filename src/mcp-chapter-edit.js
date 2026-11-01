@@ -50,6 +50,12 @@ export async function undoChapterEdit(db,{writerId,historyId,confirm}){
   'SELECT h.id,h.chapter_id,h.novel_id,h.before_body,h.after_body FROM chapter_edit_history h JOIN novels n ON n.id=h.novel_id WHERE h.id=? AND h.writer_id=? AND n.author_id=?'
  ).bind(historyId,writerId,writerId).first();
  if(!snapshot)return {ok:false,error:'not_found'};
+ // Only the latest edit snapshot may be undone. Older snapshots can match
+ // coincidentally after later revisions and must never overwrite newer work.
+ const latest=await db.prepare(
+  'SELECT id FROM chapter_edit_history WHERE chapter_id=? ORDER BY id DESC LIMIT 1'
+ ).bind(snapshot.chapter_id).first();
+ if(!latest||latest.id!==historyId)return {ok:false,error:'conflict'};
  const current=await load(db,writerId,snapshot.chapter_id);
  if(!current||current.body!==snapshot.after_body)return {ok:false,error:'conflict'};
  const result=await db.prepare(
