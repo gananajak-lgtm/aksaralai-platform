@@ -662,6 +662,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'MCP requires JSON');
   let d;try{d=JSON.parse(raw);}catch{failure(400,'Invalid MCP JSON');}
   if(!d||typeof d!=='object'||Array.isArray(d))failure(400,'Invalid MCP message');
+  if(enc.encode(raw).length>65536 && !(['preview_chapter_edit','apply_chapter_edit'].includes(d.method)&&writeMethodEnabled))failure(413,'MCP request too large');
   const id=d.id;
   const isNotification=d.method==='notifications/initialized';
   if(isNotification&&id!==undefined)failure(400,'MCP notifications must not include an id');
