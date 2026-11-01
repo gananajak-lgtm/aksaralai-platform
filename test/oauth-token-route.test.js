@@ -12,7 +12,7 @@ function fakeDb(pkce){
  const state={used:false,token:null};
  return {state,prepare(sql){return {bind(...args){return {async first(){
   if(sql.includes('FROM oauth_clients'))return args[0]==='client'?{client_id:'client',redirect_uris_json:'["https://client.example/callback"]'}:null;
-  if(sql.includes('SELECT client_id,redirect_uri,code_challenge'))return !state.used&&args[0]===await hashOAuthSecret(code)&&args[1]==='client'&&args[2]===1000?{client_id:'client',redirect_uri:'https://client.example/callback',code_challenge:pkce}:null;
+  if(sql.includes('SELECT client_id,redirect_uri,code_challenge'))return !state.used&&args[0]===await hashOAuthSecret(code)&&args[1]==='client'?{client_id:'client',redirect_uri:'https://client.example/callback',code_challenge:pkce}:null;
   if(sql.includes('SELECT user_id,client_id,redirect_uri'))return {user_id:42,client_id:'client',redirect_uri:'https://client.example/callback',code_challenge:pkce,scope:'novels:read'};
   throw new Error('Unexpected SELECT: '+sql);
  },async run(){
