@@ -67,6 +67,8 @@ async function api(req,env){
   const params=Object.fromEntries(u.searchParams);
   // Duplicate OAuth parameters are ambiguous and must never be silently overwritten.
   if([...u.searchParams.keys()].length!==Object.keys(params).length)failure(400,'Duplicate OAuth parameter');
+  // This authorization server issues tokens for this single MCP resource only.
+  if(params.resource!==undefined&&params.resource!==u.origin+'/api/mcp')failure(400,'Invalid OAuth resource');
   const approved=await prepareOAuthConsent(db,params);
   if(!approved.ok)failure(400,'Invalid OAuth authorization request');
   // Form mode remains independently gated until POST verification and code issuance are ready.
