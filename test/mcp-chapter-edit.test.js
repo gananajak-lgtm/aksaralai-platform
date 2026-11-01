@@ -19,6 +19,7 @@ function db(){
     if(args[3]!==7||args[4]!==3||args[5]!==state.body)return {meta:{changes:0}};
     state.history.push({before:state.body,after:args[1]});return {meta:{changes:1}};
    }
+   if(sql.includes('UPDATE novels'))return {meta:{changes:1}};
    if(!sql.includes('UPDATE chapters'))throw Error('Unexpected update');
    if(args[1]!==7||args[2]!==state.body||args[3]!==3)return {meta:{changes:0}};
    state.body=args[0];state.writes++;return {meta:{changes:1}};

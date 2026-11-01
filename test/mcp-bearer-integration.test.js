@@ -17,7 +17,7 @@ function database(hash,{writerId=7,grantUserId=7,role='writer',novelOwner=7,expi
   throw Error('Unexpected query: '+sql);
  },async all(){
   if(sql.includes('FROM novels WHERE author_id=?'))return {results:args[0]===novelOwner?[{id:12,title:'Owned novel',summary:'',updated_at:1}]:[]};
-  if(sql.includes('FROM chapters WHERE novel_id=?'))return {results:[{id:21,title:'Chapter 1',position:1,body:'Test manuscript'}]};
+  if(sql.includes('FROM chapters WHERE novel_id=?')){assert.deepEqual(args,[12,1,0]);return {results:[{id:21,title:'Chapter 1',position:1,body:'Test manuscript'}]};}
   throw Error('Unexpected rows: '+sql);
  }};}}}};
 }
@@ -91,5 +91,17 @@ test('MCP authenticates before reading or dispatching the request body',async()=
   const response=await worker.fetch(request,{DB:database(hash,{revoked:true}),...flags});
   assert.equal(response.status,401);
   assert.equal(bodyRead,false);
+ }
+});
+
+test('read-only OAuth cannot advertise or execute edits even when the edit flag is enabled',async()=>{
+ const db=database(await hashOAuthSecret(token));
+ const env={DB:db,...flags,AKSARALAI_MCP_CHAPTER_EDIT_ENABLED:'true'};
+ const response=await worker.fetch(rpc('tools/list'),env);
+ const names=(await response.json()).result.tools.map(t=>t.name);
+ assert.deepEqual(names,['list_novels','list_chapters','read_chapters','search_novel']);
+ for(const name of ['preview_chapter_edit','apply_chapter_edit','undo_chapter_edit','list_chapter_edit_history']){
+  const denied=await worker.fetch(rpc('tools/call',{name,arguments:{}}),env);
+  assert.equal((await denied.json()).error.code,-32602);
  }
 });

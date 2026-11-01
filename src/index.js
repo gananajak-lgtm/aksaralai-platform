@@ -653,7 +653,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
   // Full chapter edits may contain 300k Thai characters (UTF-8 can exceed 64 KiB).
   // Keep the larger limit exclusive to the explicitly enabled chapter-write tools.
-  const writeMethodEnabled=env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED==='true';
+  const writeMethodEnabled=env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED==='true'&&actor.scopes?.includes('novels:write');
   const declaredLength=Number(req.headers.get('content-length')||0);
   const maxMcpBytes=writeMethodEnabled?1500000:65536;
   if(!Number.isFinite(declaredLength)||declaredLength<0||declaredLength>maxMcpBytes)failure(413,'MCP request too large');
@@ -662,7 +662,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'MCP requires JSON');
   let d;try{d=JSON.parse(raw);}catch{failure(400,'Invalid MCP JSON');}
   if(!d||typeof d!=='object'||Array.isArray(d))failure(400,'Invalid MCP message');
-  if(enc.encode(raw).length>65536 && !(['preview_chapter_edit','apply_chapter_edit'].includes(d.method)&&writeMethodEnabled))failure(413,'MCP request too large');
+  if(enc.encode(raw).length>65536 && !(d.method==='tools/call'&&['preview_chapter_edit','apply_chapter_edit'].includes(d.params?.name)&&writeMethodEnabled))failure(413,'MCP request too large');
   const id=d.id;
   const isNotification=d.method==='notifications/initialized';
   if(isNotification&&id!==undefined)failure(400,'MCP notifications must not include an id');
@@ -682,7 +682,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
    {name:'read_chapters',description:'Read 1 to 5 chapters, maximum 100000 characters',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},start:{type:'integer',minimum:1},count:{type:'integer',minimum:1,maximum:5}},required:['novel_id','start','count'],additionalProperties:false}},
    {name:'search_novel',description:'Find short excerpts containing a literal search term',inputSchema:{type:'object',properties:{novel_id:{type:'integer',minimum:1},query:{type:'string',minLength:2,maxLength:100}},required:['novel_id','query'],additionalProperties:false}}
   ];
-  if(env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED==='true'){
+  if(writeMethodEnabled){
    specs.push(
     {name:'preview_chapter_edit',description:'Preview a proposed full-chapter revision without saving; returns a fingerprint for confirmation',inputSchema:{type:'object',properties:{chapter_id:{type:'integer',minimum:1},new_body:{type:'string',minLength:1,maxLength:300000}},required:['chapter_id','new_body'],additionalProperties:false}},
     {name:'apply_chapter_edit',description:'Save a previously previewed revision only after explicit user confirmation',inputSchema:{type:'object',properties:{chapter_id:{type:'integer',minimum:1},new_body:{type:'string',minLength:1,maxLength:300000},fingerprint:{type:'string'},confirm:{type:'boolean'}},required:['chapter_id','new_body','fingerprint','confirm'],additionalProperties:false}},
@@ -699,13 +699,13 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(keys.some(k=>!allowed.includes(k)))return err(-32602,'Unknown tool argument');
   let data;
   if(name==='list_chapter_edit_history'){
-   if(env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED!=='true')return err(-32601,'Method not found');
+   if(!writeMethodEnabled)return err(-32601,'Method not found');
    if(!Number.isSafeInteger(args.chapter_id)||args.chapter_id<1)return err(-32602,'Invalid chapter_id');
    const history=await rows(db,'SELECT h.id,h.chapter_id,h.created_at,length(h.before_body) AS before_length,length(h.after_body) AS after_length FROM chapter_edit_history h JOIN novels n ON n.id=h.novel_id WHERE h.chapter_id=? AND h.writer_id=? AND n.author_id=? ORDER BY h.id DESC LIMIT 30',args.chapter_id,actor.id,actor.id);
    return result({content:[{type:'text',text:JSON.stringify({history})}],isError:false});
   }
   if(name==='preview_chapter_edit'||name==='apply_chapter_edit'||name==='undo_chapter_edit'){
-   if(env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED!=='true')return err(-32601,'Method not found');
+   if(!writeMethodEnabled)return err(-32601,'Method not found');
    const payload=name==='undo_chapter_edit'?{writerId:actor.id,historyId:args.history_id,confirm:args.confirm}:{writerId:actor.id,chapterId:args.chapter_id,newBody:args.new_body,fingerprint:args.fingerprint,confirm:args.confirm};
    const response=name==='preview_chapter_edit'?await previewChapterEdit(db,payload):name==='apply_chapter_edit'?await applyChapterEdit(db,payload):await undoChapterEdit(db,payload);
    return result({content:[{type:'text',text:JSON.stringify(response)}],isError:!response.ok});
@@ -719,7 +719,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
    if(name==='read_chapters'){
     const start=args.start,count=args.count;
     if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)return err(-32602,'Invalid chapter range');
-    const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',count,start-1);
+    const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',nid,count,start-1);
     if(chapters.reduce((n,c)=>n+(c.body?.length||0),0)>100000)return err(-32602,'Chapter range exceeds 100000 characters');
     data={novel_id:nid,start,chapters};
    }
@@ -748,7 +748,7 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!/^[1-9][0-9]*$/.test(startText)||!/^[1-9][0-9]*$/.test(countText))failure(400,'ช่วงตอนต้องเป็นจำนวนเต็มบวก');
   const start=Number(startText),count=Number(countText);
   if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(count)||count<1||count>5)failure(400,'อ่านได้ครั้งละ 1–5 ตอน และ start ต้องมากกว่า 0');
-  const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',count,start-1);
+  const chapters=await rows(db,'SELECT id,title,position,body FROM chapters WHERE novel_id=? ORDER BY position,id LIMIT ? OFFSET ?',nid,count,start-1);
   // Bound payload size to avoid overflowing model context and Worker memory.
   if(chapters.reduce((sum,c)=>sum+(c.body?.length||0),0)>100000)failure(413,'ช่วงตอนยาวเกินไป กรุณาลดจำนวนตอน');
   return reply({novel_id:nid,start,count:chapters.length,chapters});
