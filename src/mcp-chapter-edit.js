@@ -41,7 +41,7 @@ export async function applyChapterEdit(db,{writerId,chapterId,newBody,fingerprin
  // Snapshot must be captured before the update in the atomic D1 batch.
  const results=await db.batch([history,update]);
  if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1)return {ok:false,error:'conflict'};
- return {ok:true,chapter_id:chapterId,novel_id:chapter.novel_id};
+ return {ok:true,chapter_id:chapterId,novel_id:chapter.novel_id,history_id:results[0]?.meta?.last_row_id??null};
 }
 
 export async function undoChapterEdit(db,{writerId,historyId,confirm}){
