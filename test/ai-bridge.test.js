@@ -3,14 +3,6 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../src/index.js',import.meta.url),'utf8');
 
-test('MCP requires OAuth writer authentication before dispatch',()=>{
- const start=source.indexOf("if(p==='/api/mcp'&&m==='POST')");
- assert.ok(start>0);
- const block=source.slice(start,source.indexOf(' // Read-only AI Bridge endpoints.',start));
- assert.match(block,/await resolveMcpWriter\(db,req,clock\(\),authenticateOAuthBearer\)/);
- assert.ok(block.indexOf('await resolveMcpWriter(db,req,clock(),authenticateOAuthBearer)')<block.indexOf('const d=await payload(req)'));
-
-});
 test('MCP does not advertise mutation tools',()=>{
  const block=source.slice(source.indexOf("if(p==='/api/mcp'&&m==='POST')"),source.indexOf(' // Read-only AI Bridge endpoints.'));
  assert.match(block,/name:'list_novels'/);
@@ -58,3 +50,4 @@ test('batch manuscript export binds novel id, count, and offset',()=>{
  assert.match(source,/LIMIT \? OFFSET \?',novelId,count,start-1\)/);
  assert.match(source,/MANUSCRIPT_EXPORT_READ_FAILED/);
 });
+

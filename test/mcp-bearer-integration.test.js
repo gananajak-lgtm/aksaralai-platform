@@ -76,3 +76,20 @@ test('MCP rejects malformed JSON after successful bearer authorization',async()=
  const response=await worker.fetch(request,{DB:db,...flags});
  assert.equal(response.status,400);
 });
+
+
+// Authentication must finish before reading any untrusted JSON-RPC body.
+test('MCP authenticates before reading or dispatching the request body',async()=>{
+ const hash=await hashOAuthSecret(token);
+ for(const authorization of [null,'Bearer invalid','Bearer '+token]){
+  let bodyRead=false;
+  const request=new Request('https://aksaralai.example/api/mcp',{
+   method:'POST',headers:{'content-type':'application/json','accept':'application/json',
+    ...(authorization?{authorization}: {})},body:'{broken'
+  });
+  request.text=async()=>{bodyRead=true;throw new Error('Unauthorized body read');};
+  const response=await worker.fetch(request,{DB:database(hash,{revoked:true}),...flags});
+  assert.equal(response.status,401);
+  assert.equal(bodyRead,false);
+ }
+});
