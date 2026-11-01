@@ -8,7 +8,11 @@ export async function handleOAuthToken(db,request,{now}){
  if(request.method!=='POST')return error('invalid_request',405);
  const type=request.headers.get('content-type')||'';
  if(!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test(type))return error('invalid_request',415);
- if(Number(request.headers.get('content-length')||0)>8192)return error('invalid_request',413);
+ const declaredLength=request.headers.get('content-length');
+ if(declaredLength!==null){
+  if(!/^(0|[1-9][0-9]*)$/.test(declaredLength))return error('invalid_request');
+  if(Number(declaredLength)>8192)return error('invalid_request',413);
+ }
  const body=await request.text();
  if(new TextEncoder().encode(body).length>8192)return error('invalid_request',413);
  const pairs=[...new URLSearchParams(body)];
