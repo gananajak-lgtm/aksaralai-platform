@@ -651,10 +651,14 @@ document.getElementById('print-manuscript').addEventListener('click',function(){
   if(!actor)return reply({detail:'MCP requires OAuth authorization'},401,{'www-authenticate':'Bearer resource_metadata="'+u.origin+'/.well-known/oauth-protected-resource/api/mcp"'});
   const accept=req.headers.get('accept')||'';
   if(!accept.includes('application/json')&&!accept.includes('*/*'))failure(406,'MCP client must accept application/json');
-  // MCP calls are control messages, not manuscript uploads. Bound request size.
-  if(Number(req.headers.get('content-length')||0)>65536)failure(413,'MCP request too large');
+  // Full chapter edits may contain 300k Thai characters (UTF-8 can exceed 64 KiB).
+  // Keep the larger limit exclusive to the explicitly enabled chapter-write tools.
+  const writeMethodEnabled=env.AKSARALAI_MCP_CHAPTER_EDIT_ENABLED==='true';
+  const declaredLength=Number(req.headers.get('content-length')||0);
+  const maxMcpBytes=writeMethodEnabled?1500000:65536;
+  if(!Number.isFinite(declaredLength)||declaredLength<0||declaredLength>maxMcpBytes)failure(413,'MCP request too large');
   const raw=await req.text();
-  if(enc.encode(raw).length>65536)failure(413,'MCP request too large');
+  if(enc.encode(raw).length>maxMcpBytes)failure(413,'MCP request too large');
   if(!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))failure(415,'MCP requires JSON');
   let d;try{d=JSON.parse(raw);}catch{failure(400,'Invalid MCP JSON');}
   if(!d||typeof d!=='object'||Array.isArray(d))failure(400,'Invalid MCP message');
