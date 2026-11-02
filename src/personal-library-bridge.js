@@ -35,6 +35,8 @@ export async function personalLibraryBridge(request,env){
  const provided=request.headers.get('authorization');
  if(typeof configured!=='string'||configured.length<32||!safeEqual(provided,'Bearer '+configured))return json({error:'unauthorized'},401);
  if(!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return json({error:'json_required'},415);
+ const declared=Number(request.headers.get('content-length')||0);
+ if(!Number.isFinite(declared)||declared<0||declared>1500000)return json({error:'too_large'},413);
  const raw=await request.text();
  if(new TextEncoder().encode(raw).length>1500000)return json({error:'too_large'},413);
  let body;try{body=JSON.parse(raw)}catch{return json({error:'invalid_json'},400)}
