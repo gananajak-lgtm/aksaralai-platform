@@ -1,4 +1,5 @@
 import {previewChapterEdit,applyChapterEdit,undoChapterEdit} from './mcp-chapter-edit.js';
+import {personalLibraryBridge} from './personal-library-bridge.js';
 import {makeDocx,makePlainText} from './manuscript-export.js';
 import {resolveMcpWriter} from './mcp-auth.js';
 import {authenticateOAuthBearer} from './oauth-bearer.js';
@@ -895,6 +896,10 @@ export default {async fetch(req,env){
  if(url.pathname==='/health')return reply({status:'ok'});
  if(m==='GET'&&url.pathname.startsWith('/.well-known/oauth-')){
   try{return await api(req,env);}catch(e){const status=Number.isInteger(e.status)?e.status:500;return reply({detail:status===503?'Discovery is disabled':'Metadata unavailable'},status); }
+ }
+ if(url.pathname.startsWith('/api/library/')){
+  if(m!=='GET'&&m!=='POST')return reply({detail:'Method not allowed'},405);
+  try{return await personalLibraryBridge(req,env);}catch(e){console.error('Personal library bridge failure',String(e));return reply({detail:'Library unavailable'},500);}
  }
  if(url.pathname.startsWith('/api/')){
   if(!['GET','POST','PUT','DELETE'].includes(m))return reply({detail:'Method not allowed'},405,{allow:'GET, POST, PUT, DELETE'});
