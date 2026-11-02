@@ -252,3 +252,10 @@ Fresh HEAD 45c1403; OAuth consent POST remains denial-only. Next: gated approval
 - Commit b01fb74 limits redemption arguments and checks expiry arithmetic.
 - The HTTP token route is not yet connected. Consent approval remains disabled by default. No CI or deployment validation has been completed for these commits.
 - Next work: route-level registered-client and redirect validation, request validation, token redemption tests, and only then gated integration. Chapter write access remains future work.
+
+## Optional simplified library API (2026-11-02)
+- 252c739 introduces src/personal-library-bridge.js; 874169d routes /api/library/* without OAuth; 74d4ad adds basic regression tests.
+- All new endpoints are OFF by default unless AKSARALAI_PUBLIC_LIBRARY_ENABLED=true. GET /api/library/novels, GET /api/library/novels/:id/chapters, GET /api/library/chapters/:id deliberately expose **all** novels and chapters, including unpublished content, when enabled. Owner explicitly accepted public reading.
+- POST /api/library/edit stays separately disabled unless AKSARALAI_LIBRARY_WRITE_ENABLED=true. Requires a private AKSARALAI_LIBRARY_WRITE_KEY (at least 32 characters) in a Cloudflare Secret, and AKSARALAI_LIBRARY_WRITER_ID identifying the intended writer. Accepts action preview/apply/undo. Apply requires fingerprint+confirm; chapter ownership and edit history handled by existing mcp-chapter-edit primitives. Do not expose the write key in frontend JS, URLs, logs or ChatGPT conversation.
+- Do not enable writes before migrations creating chapter_edit_history, full CI, remote D1 verification, and end-to-end authorization testing. The API alone does not make ChatGPT able to invoke it: a suitable connected tool or browser workflow is still needed.
+- No production deployment or live chapter modification was performed.
