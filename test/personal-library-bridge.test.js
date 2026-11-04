@@ -32,3 +32,34 @@ test('edit cannot run without separate write flag and strong bearer secret',asyn
  assert.equal((await personalLibraryBridge(req(),base)).status,503);
  assert.equal((await personalLibraryBridge(req(),{...base,AKSARALAI_LIBRARY_WRITE_ENABLED:'true',AKSARALAI_LIBRARY_WRITE_KEY:'a'.repeat(40)})).status,401);
 });
+
+test('public read access never grants write access',async()=>{
+ const env={DB:db,AKSARALAI_PUBLIC_LIBRARY_ENABLED:'true'};
+ const response=await personalLibraryBridge(new Request('https://example.test/api/library/edit',{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({action:'apply',chapter_id:2,new_body:'ห้ามเปลี่ยน',confirm:true})
+ }),env);
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'write_disabled'});
+});
+test('enabled write route rejects missing, incorrect, or short secrets before database access',async()=>{
+ const base={DB:db,AKSARALAI_PUBLIC_LIBRARY_ENABLED:'true',AKSARALAI_LIBRARY_WRITE_ENABLED:'true'};
+ const make=(authorization)=>new Request('https://example.test/api/library/edit',{
+  method:'POST',headers:{'content-type':'application/json',...(authorization?{authorization}:{})},
+  body:JSON.stringify({action:'preview',chapter_id:2,new_body:'ทดสอบ'})
+ });
+ for(const [key,authorization] of [
+  [undefined,undefined],
+  ['short','Bearer short'],
+  ['x'.repeat(40),'Bearer '+ 'y'.repeat(40)]
+ ]){
+  const res=await personalLibraryBridge(make(authorization),{...base,AKSARALAI_LIBRARY_WRITE_KEY:key});
+  assert.equal(res.status,401);
+  assert.deepEqual(await res.json(),{error:'unauthorized'});
+ }
+});
+test('GET cannot invoke edit actions even when write is enabled',async()=>{
+ const env={DB:db,AKSARALAI_PUBLIC_LIBRARY_ENABLED:'true',AKSARALAI_LIBRARY_WRITE_ENABLED:'true',AKSARALAI_LIBRARY_WRITE_KEY:'x'.repeat(40)};
+ const res=await personalLibraryBridge(get('/api/library/edit?action=apply&chapter_id=2'),env);
+ assert.equal(res.status,404);
+});
